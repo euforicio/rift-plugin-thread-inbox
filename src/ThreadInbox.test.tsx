@@ -395,6 +395,10 @@ describe("card metadata", () => {
       "[data-thread-card-identity-scroll]",
     );
     expect(scrollLabel?.className).toContain("transition-opacity");
+    expect(scrollLabel?.className).toContain("group-focus/metadata:opacity-100");
+    expect(
+      metadata?.querySelector("[data-thread-card-identity-text]")?.className,
+    ).toContain("group-focus/metadata:opacity-0");
     const branch = metadata?.querySelector("[data-thread-card-branch]");
     expect(branch?.className).toContain("font-mono");
     expect(branch?.className).toContain("text-muted-foreground/70");
@@ -404,7 +408,7 @@ describe("card metadata", () => {
     ).toBeTruthy();
   });
 
-  it("forwards split dragging from the whole card, including metadata", () => {
+  it("forwards split dragging from metadata", () => {
     const rendered = render([
       thread({
         id: "thr_drag",
@@ -421,6 +425,33 @@ describe("card metadata", () => {
     expect(rendered.sidebarActionCalls).toContainEqual({
       method: "open",
       threadId: "thr_drag",
+    });
+  });
+
+  it("does not start split dragging from card controls", async () => {
+    const rendered = renderSlot(inbox, listProps, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [thread({ id: "thr_controls" })],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: { listLifecycle: () => ({ rows: [] }) },
+      sidebarPullRequests: {
+        thr_controls: {
+          number: 412,
+          title: "Fix the flake",
+          url: "https://github.com/o/r/pull/412",
+          state: "open",
+          attention: "none",
+        } as never,
+      },
+    });
+    fireEvent.pointerDown(await screen.findByLabelText("Snooze until tomorrow"));
+    fireEvent.pointerDown(screen.getByLabelText("Settle thread"));
+    fireEvent.pointerDown(screen.getByRole("link", { name: "#412" }));
+    expect(rendered.sidebarActionCalls).not.toContainEqual({
+      method: "open",
+      threadId: "thr_controls",
     });
   });
 

@@ -4,6 +4,7 @@ import {
   useState,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEventHandler,
 } from "react";
 import {
   experimental_useSidebarThreadPullRequest as useSidebarThreadPullRequest,
@@ -53,7 +54,6 @@ export function ThreadCard({
     <li className="list-none">
       <RowContextMenu thread={thread}>
         <div
-          {...splitProps}
           className={cn(
             "group/card relative rounded-md px-2.5 py-2 transition-colors",
             isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
@@ -65,6 +65,7 @@ export function ThreadCard({
             data-sidebar-thread-id={thread.id}
             href="#"
             aria-label={threadDisplayTitle(thread)}
+            {...splitProps}
             onClick={openThread}
             className="absolute inset-0 cursor-pointer rounded-md"
           />
@@ -105,6 +106,7 @@ export function ThreadCard({
               branchName={thread.environment?.branchName ?? null}
               hostName={thread.host?.name ?? null}
               onOpen={openThread}
+              onSplitPointerDown={splitProps.onPointerDown}
             />
             {thread.activity.workflows > 0 ? (
               <ActivityCount label="workflows" count={thread.activity.workflows} />
@@ -150,6 +152,7 @@ function MetadataIdentity({
   branchName,
   hostName,
   onOpen,
+  onSplitPointerDown,
 }: {
   projectName: string | null;
   branchName: string | null;
@@ -157,6 +160,7 @@ function MetadataIdentity({
   onOpen: (
     event: Pick<MouseEvent | KeyboardEvent, "preventDefault" | "metaKey" | "ctrlKey">,
   ) => void;
+  onSplitPointerDown?: PointerEventHandler<HTMLElement>;
 }) {
   const detail = branchName ?? hostName;
   const fullLabel = [projectName, detail].filter(Boolean).join(" · ");
@@ -256,6 +260,7 @@ function MetadataIdentity({
       tabIndex={0}
       className="group/metadata pointer-events-auto relative min-w-0 flex-1 cursor-pointer overflow-hidden whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
       onClick={onOpen}
+      onPointerDown={onSplitPointerDown}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") onOpen(event);
       }}
@@ -267,7 +272,7 @@ function MetadataIdentity({
       <span
         data-thread-card-identity-text=""
         className={cn(
-          "block truncate transition-opacity duration-200 group-hover/metadata:opacity-0",
+          "block truncate transition-opacity duration-200 group-hover/metadata:opacity-0 group-focus/metadata:opacity-0",
           isReturning && "opacity-0",
         )}
       >
@@ -277,7 +282,7 @@ function MetadataIdentity({
         aria-hidden
         data-thread-card-identity-scroll=""
         className={cn(
-          "pointer-events-none absolute inset-0 min-w-0 overflow-x-auto whitespace-nowrap opacity-0 transition-opacity duration-200 [scrollbar-width:none] group-hover/metadata:opacity-100 [&::-webkit-scrollbar]:hidden",
+          "pointer-events-none absolute inset-0 min-w-0 overflow-x-auto whitespace-nowrap opacity-0 transition-opacity duration-200 [scrollbar-width:none] group-hover/metadata:opacity-100 group-focus/metadata:opacity-100 [&::-webkit-scrollbar]:hidden",
           isReturning && "opacity-100",
         )}
       >
