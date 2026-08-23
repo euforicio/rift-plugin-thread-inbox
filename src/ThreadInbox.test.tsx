@@ -363,9 +363,59 @@ describe("row context menu", () => {
 });
 
 describe("card metadata", () => {
+  it("places the title above combined project and branch metadata", () => {
+    render([
+      thread({
+        title: "Patch the sidebar",
+        environment: {
+          id: "env_1",
+          name: null,
+          branchName: "main",
+          workspaceDisplayKind: "managed-worktree",
+        },
+      }),
+    ]);
+    const primary = screen.getByText("Patch the sidebar").closest(
+      "[data-thread-card-primary]",
+    );
+    const identity = screen.getByLabelText("bb · main");
+    const metadata = identity.closest("[data-thread-card-metadata]");
+    expect(primary).not.toBeNull();
+    expect(metadata).not.toBeNull();
+    expect(identity.className).toContain("pointer-events-auto");
+    expect(
+      metadata?.querySelector("[data-thread-card-identity-text]")?.className,
+    ).toContain("truncate");
+    const scrollLabel = metadata?.querySelector(
+      "[data-thread-card-identity-scroll]",
+    );
+    expect(scrollLabel?.className).toContain("transition-opacity");
+    const branch = metadata?.querySelector("[data-thread-card-branch]");
+    expect(branch?.className).toContain("font-mono");
+    expect(branch?.className).toContain("text-muted-foreground/70");
+    expect(
+      primary!.compareDocumentPosition(metadata!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("always shows the provider glyph, even without a branch", async () => {
     render([thread({ id: "thr_p", providerId: "claude-code" })]);
     expect(await screen.findByLabelText("Claude Code")).toBeDefined();
+  });
+
+  it("renders the current provider's branded mark", () => {
+    render([thread({ providerId: "acp-grok" })]);
+    expect(
+      screen.getByRole("img", { name: "Grok Build" }).querySelector("svg"),
+    ).not.toBeNull();
+  });
+
+  it("falls back to a code mark for an unknown ACP provider", () => {
+    render([thread({ providerId: "acp-custom" })]);
+    expect(
+      screen.getByRole("img", { name: "acp-custom" }).querySelector("svg"),
+    ).not.toBeNull();
   });
 
   it("falls back to a neutral glyph for an unknown provider", async () => {
@@ -382,7 +432,7 @@ describe("card metadata", () => {
         host: { id: "host_1", name: "Sawyer's MacBook" },
       }),
     ]);
-    expect(await screen.findByText("Sawyer's MacBook")).toBeDefined();
+    expect(await screen.findAllByText("Sawyer's MacBook")).toHaveLength(2);
   });
 
   it("prefers the branch over the machine when both exist", async () => {
@@ -398,7 +448,7 @@ describe("card metadata", () => {
         },
       }),
     ]);
-    expect(await screen.findByText("bb/feature")).toBeDefined();
+    expect(await screen.findAllByText("bb/feature")).toHaveLength(2);
     expect(screen.queryByText("Sawyer's MacBook")).toBeNull();
   });
 
