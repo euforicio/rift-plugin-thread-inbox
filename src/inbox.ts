@@ -1,4 +1,7 @@
-import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
+import type {
+  PluginSidebarThread,
+  PluginSidebarThreadIndicator,
+} from "@get-bb/plugin-sdk";
 
 /**
  * The sort that defines this sidebar: newest thread on top, and NOTHING moves
@@ -24,6 +27,10 @@ export function threadDisplayTitle(thread: PluginSidebarThread): string {
   return fallback ? fallback : "Untitled thread";
 }
 
+function threadTitleMatches(thread: PluginSidebarThread, normalized: string) {
+  return threadDisplayTitle(thread).toLowerCase().includes(normalized);
+}
+
 /** Substring match on the visible title only, preserving the incoming order. */
 export function searchThreadsByTitle(
   threads: readonly PluginSidebarThread[],
@@ -31,9 +38,7 @@ export function searchThreadsByTitle(
 ): PluginSidebarThread[] {
   const normalized = query.trim().toLowerCase();
   if (normalized.length === 0) return [...threads];
-  return threads.filter((thread) =>
-    threadDisplayTitle(thread).toLowerCase().includes(normalized),
-  );
+  return threads.filter((thread) => threadTitleMatches(thread, normalized));
 }
 
 export interface ProjectScope {
@@ -95,6 +100,22 @@ export function hideChildrenOfVisibleParents(
  * archived or in another project: the flat list hides those, but the child
  * still needs a way back to them.
  */
+export function searchThreadGroupsByTitle(
+  roots: readonly PluginSidebarThread[],
+  allThreads: readonly PluginSidebarThread[],
+  query: string,
+): PluginSidebarThread[] {
+  const normalized = query.trim().toLowerCase();
+  if (normalized.length === 0) return [...roots];
+  return roots.filter(
+    (root) =>
+      threadTitleMatches(root, normalized) ||
+      childrenOf(allThreads, root.id).some((child) =>
+        threadTitleMatches(child, normalized),
+      ),
+  );
+}
+
 export function parentOf(
   threads: readonly PluginSidebarThread[],
   threadId: string,
@@ -112,5 +133,61 @@ export function childrenOf(
 ): PluginSidebarThread[] {
   return threads
     .filter((thread) => thread.parentThreadId === parentThreadId)
-    .sort((left, right) => left.createdAt - right.createdAt);
+    .sort(
+      (left, right) =>
+        left.createdAt - right.createdAt || left.id.localeCompare(right.id),
+    );
+}
+
+export function descendantsOf(
+  threads: readonly PluginSidebarThread[],
+  parentThreadId: string,
+): PluginSidebarThread[] {
+  const result: PluginSidebarThread[] = [];
+  const seen = new Set<string>([parentThreadId]);
+  const visit = (id: string) => {
+    for (const child of childrenOf(threads, id)) {
+      if (seen.has(child.id)) continue;
+      seen.add(child.id);
+      result.push(child);
+      visit(child.id);
+    }
+  };
+  visit(parentThreadId);
+  return result;
+}
+
+const INDICATOR_PRECEDENCE: readonly PluginSidebarThreadIndicator[] = [
+  "unread-error",
+  "waiting-for-input",
+  "working-draft",
+  "workflow",
+  "background-agent",
+  "background-command",
+  "plan-mode",
+  "goal",
+  "runtime",
+  "draft",
+  "unread-success",
+  "none",
+];
+
+const indicatorRank = new Map(
+  INDICATOR_PRECEDENCE.map((indicator, index) => [indicator, index]),
+);
+
+export function statusSourceForGroup(
+  parent: PluginSidebarThread,
+  descendants: readonly PluginSidebarThread[],
+): PluginSidebarThread {
+  let best = parent;
+  let bestRank = indicatorRank.get(parent.indicator) ?? Number.MAX_SAFE_INTEGER;
+  for (const thread of descendants) {
+    const rank = indicatorRank.get(thread.indicator) ?? Number.MAX_SAFE_INTEGER;
+    if (rank < bestRank) {
+      best = thread;
+      bestRank = rank;
+    }
+  }
+  return best;
 }

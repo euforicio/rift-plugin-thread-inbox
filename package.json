@@ -1,8 +1,8 @@
 {
   "name": "bb-plugin-t3sidebar",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
-  "description": "An inbox-style sidebar: one flat list of cards that never re-orders.",
+  "description": "A stable inbox sidebar with collapsible nested child threads.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -15,7 +15,7 @@
   },
   "bb": {
     "name": "T3 Sidebar",
-    "description": "An inbox-style sidebar: one flat list of cards that never re-orders.",
+    "description": "Stable inbox ordering with collapsible nested child threads.",
     "branding": {
       "icon": "PanelLeft"
     },
@@ -23,7 +23,10 @@
     "server": "./src/server.ts"
   },
   "keywords": [
-    "bb-plugin"
+    "bb-plugin",
+    "sidebar",
+    "threads",
+    "nested"
   ],
   "scripts": {
     "build": "bb plugin build",

@@ -1,14 +1,18 @@
 # T3 Sidebar — WYEZ fork
 
-A compact inbox-style sidebar for BB. Forked from
+[![CI](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml/badge.svg)](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml)
+
+A compact inbox-style sidebar for BB, forked from
 [Sawyer Hood's T3 Sidebar](https://github.com/SawyerHood/bb-plugin-t3sidebar).
 
 ## Changes in this fork
 
-- Two-line cards: title and status, then `project · branch`.
-- Correct greyscale provider icons with fallbacks for unknown providers.
-- Subdued monospace branch names.
-- Long metadata scrolls on hover and animates back on mouse leave.
+- Child threads nest beneath collapsible parent cards.
+- Child status and activity bubble up to the parent.
+- Number shortcuts target top-level threads only.
+- Two-line cards show title/status above `project · branch` metadata.
+- Greyscale provider icons match BB's model picker.
+- Long metadata reveals on hover or keyboard focus.
 
 ## Install
 
@@ -21,18 +25,16 @@ Select **T3 Sidebar** under **Settings → Appearance → Sidebar**.
 Update later with:
 
 ```sh
-bb plugin outdated
 bb plugin update t3sidebar
 ```
 
 ## Behavior
 
-- Threads stay in creation order instead of moving when their status changes.
-- Pinned threads appear first.
-- Snoozed threads return on time or when activity resumes.
-- Settled threads move to a collapsed shelf.
-- Active work and threads waiting for input cannot be parked.
-- Child threads stay out of the flat list and are reached through header
-  controls.
+- Top-level threads stay in creation order instead of moving with status.
+- Parents collapse by default and show their direct child count.
+- Opening or searching for a child expands its parent.
+- Live descendant work prevents the parent from being parked.
+- Deeper descendants remain accessible through thread-header controls.
+- Snoozed and settled groups stay in collapsed shelves.
 
 MIT licensed; see [LICENSE](LICENSE).

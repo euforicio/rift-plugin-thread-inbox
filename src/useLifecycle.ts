@@ -25,8 +25,14 @@ export function isWorking(thread: PluginSidebarThread): boolean {
 }
 
 export interface LifecycleApi {
-  shelfFor(thread: PluginSidebarThread): ThreadShelf;
-  canPark(thread: PluginSidebarThread): boolean;
+  shelfFor(
+    thread: PluginSidebarThread,
+    descendants?: readonly PluginSidebarThread[],
+  ): ThreadShelf;
+  canPark(
+    thread: PluginSidebarThread,
+    descendants?: readonly PluginSidebarThread[],
+  ): boolean;
   wakeAtFor(thread: PluginSidebarThread): number | null;
   settle(threadId: string): void;
   unsettle(threadId: string): void;
@@ -88,12 +94,22 @@ export function useLifecycle(
   }, [now, rows]);
 
   return useMemo<LifecycleApi>(() => {
-    const signalsFor = (thread: PluginSidebarThread) => ({
-      hasPendingInteraction: thread.hasPendingInteraction,
-      isWorking: isWorking(thread),
-      isUnread: thread.isUnread,
-      latestAttentionAt: thread.latestAttentionAt,
-    });
+    const signalsFor = (
+      thread: PluginSidebarThread,
+      descendants: readonly PluginSidebarThread[] = [],
+    ) => {
+      const group = [thread, ...descendants];
+      return {
+        hasPendingInteraction: group.some(
+          (candidate) => candidate.hasPendingInteraction,
+        ),
+        isWorking: group.some(isWorking),
+        isUnread: group.some((candidate) => candidate.isUnread),
+        latestAttentionAt: Math.max(
+          ...group.map((candidate) => candidate.latestAttentionAt),
+        ),
+      };
+    };
     // One read per mutation: the write publishes on the realtime channel, and
     // that subscription already triggers a refresh for every client.
     const mutate = async (
@@ -103,9 +119,10 @@ export function useLifecycle(
       await rpc.call(method, { threadId });
     };
     return {
-      shelfFor: (thread) =>
-        resolveShelf(rows.get(thread.id), signalsFor(thread), now),
-      canPark: (thread) => canPark(signalsFor(thread)),
+      shelfFor: (thread, descendants = []) =>
+        resolveShelf(rows.get(thread.id), signalsFor(thread, descendants), now),
+      canPark: (thread, descendants = []) =>
+        canPark(signalsFor(thread, descendants)),
       wakeAtFor: (thread) => rows.get(thread.id)?.snoozedUntil ?? null,
       settle: (threadId) => void mutate("settle", threadId),
       unsettle: (threadId) => void mutate("unsettle", threadId),

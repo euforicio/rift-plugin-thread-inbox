@@ -5,6 +5,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type PointerEventHandler,
+  type ReactNode,
 } from "react";
 import {
   experimental_useSidebarThreadPullRequest as useSidebarThreadPullRequest,
@@ -22,6 +23,7 @@ import { resolveSnoozePresets } from "./lifecycle";
 
 export function ThreadCard({
   thread,
+  statusThread = thread,
   projectName,
   isActive,
   canPark,
@@ -29,8 +31,13 @@ export function ThreadCard({
   onSettle,
   onSnooze,
   now,
+  childCount = 0,
+  childrenExpanded = false,
+  onToggleChildren,
+  children,
 }: {
   thread: PluginSidebarThread;
+  statusThread?: PluginSidebarThread;
   projectName: string | null;
   isActive: boolean;
   canPark: boolean;
@@ -38,6 +45,10 @@ export function ThreadCard({
   onSettle: () => void;
   onSnooze: (snoozedUntil: number) => void;
   now: number;
+  childCount?: number;
+  childrenExpanded?: boolean;
+  onToggleChildren?: () => void;
+  children?: ReactNode;
 }) {
   const actions = useSidebarThreadActions();
   const { splitProps, layout } = useSidebarThreadSplit(thread.id);
@@ -94,7 +105,7 @@ export function ThreadCard({
               </span>
             ) : null}
             <span className={cn(STATUS_SLOT_CLASS, canPark && "group-hover/card:hidden")}>
-              <StatusOrTime thread={thread} now={now} />
+              <StatusOrTime thread={statusThread} now={now} />
             </span>
           </div>
           <div
@@ -139,10 +150,39 @@ export function ThreadCard({
                 #{pullRequest.number}
               </a>
             ) : null}
-            <ProviderGlyph providerId={thread.providerId} />
+            <span
+              data-thread-card-fixed-trailing=""
+              className="relative flex w-12 shrink-0 items-center justify-end gap-1"
+            >
+              {childCount > 0 && onToggleChildren ? (
+                <button
+                  type="button"
+                  aria-label={`${childrenExpanded ? "Hide" : "Show"} ${childCount} child ${childCount === 1 ? "thread" : "threads"}`}
+                  aria-expanded={childrenExpanded}
+                  title={`${childCount} child ${childCount === 1 ? "thread" : "threads"}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onToggleChildren();
+                  }}
+                  className="pointer-events-auto relative flex h-4 min-w-0 items-center gap-0.5 rounded px-0.5 tabular-nums text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                >
+                  <Icon
+                    name="ChevronDown"
+                    className={cn(
+                      "size-3 shrink-0 transition-transform",
+                      !childrenExpanded && "-rotate-90",
+                    )}
+                  />
+                  <span className="truncate">{childCount}</span>
+                </button>
+              ) : null}
+              <ProviderGlyph providerId={thread.providerId} />
+            </span>
           </div>
         </div>
       </RowContextMenu>
+      {children}
     </li>
   );
 }

@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import {
   childrenOf,
+  descendantsOf,
   filterByProject,
   hideChildrenOfVisibleParents,
   parentOf,
   partitionPinned,
+  searchThreadGroupsByTitle,
   searchThreadsByTitle,
   sortByCreatedAtDescending,
+  statusSourceForGroup,
   threadDisplayTitle,
   visibleInboxThreads,
 } from "./inbox";
@@ -173,17 +176,52 @@ describe("child threads", () => {
     expect(visible.map((t) => t.id)).toEqual(["child"]);
   });
 
-  it("lists a thread's children oldest first", () => {
+  it("lists a thread's children oldest first with stable ties", () => {
     const children = childrenOf(
       [
         thread({ id: "parent" }),
         thread({ id: "b", parentThreadId: "parent", createdAt: 20 }),
+        thread({ id: "c", parentThreadId: "parent", createdAt: 10 }),
         thread({ id: "a", parentThreadId: "parent", createdAt: 10 }),
         thread({ id: "other", parentThreadId: "elsewhere" }),
       ],
       "parent",
     );
-    expect(children.map((t) => t.id)).toEqual(["a", "b"]);
+    expect(children.map((t) => t.id)).toEqual(["a", "c", "b"]);
+  });
+
+  it("finds descendants without looping through malformed cycles", () => {
+    const descendants = descendantsOf(
+      [
+        thread({ id: "parent", parentThreadId: "grandchild" }),
+        thread({ id: "child", parentThreadId: "parent" }),
+        thread({ id: "grandchild", parentThreadId: "child" }),
+      ],
+      "parent",
+    );
+    expect(descendants.map((t) => t.id)).toEqual(["child", "grandchild"]);
+  });
+
+  it("keeps a parent when its child matches search", () => {
+    const parent = thread({ id: "parent", title: "Parent" });
+    const child = thread({
+      id: "child",
+      title: "Needle",
+      parentThreadId: "parent",
+    });
+    expect(searchThreadGroupsByTitle([parent], [parent, child], "needle")).toEqual([
+      parent,
+    ]);
+  });
+
+  it("bubbles the strongest descendant status to the parent", () => {
+    const parent = thread({ id: "parent", indicator: "runtime" });
+    const child = thread({
+      id: "child",
+      parentThreadId: "parent",
+      indicator: "waiting-for-input",
+    });
+    expect(statusSourceForGroup(parent, [child])).toBe(child);
   });
 });
 

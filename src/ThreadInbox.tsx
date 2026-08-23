@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreads as useSidebarThreads,
   type PluginSidebarThread,
   type PluginThreadListProps,
@@ -14,16 +13,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./components/Select";
+import { ChildThreadRow } from "./ChildThreadRow";
 import { ThreadCard } from "./ThreadCard";
 import { SlimRow } from "./SlimRow";
 import { useLifecycle } from "./useLifecycle";
 import { TRAILING_GLYPH_BOX_CLASS } from "./StatusSlot";
 import {
+  childrenOf,
+  descendantsOf,
   filterByProject,
   hideChildrenOfVisibleParents,
   partitionPinned,
+  searchThreadGroupsByTitle,
   searchThreadsByTitle,
   sortByCreatedAtDescending,
+  statusSourceForGroup,
+  threadDisplayTitle,
   visibleInboxThreads,
 } from "./inbox";
 
@@ -42,7 +47,6 @@ export function ThreadInbox({
   searchQuery,
 }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
-  const actions = useSidebarThreadActions();
   const lifecycle = useLifecycle(threads);
   const [scope, setScope] = useState<string>(ALL_PROJECTS);
   // One clock for every card in a render, quantized to the minute so the
@@ -60,34 +64,35 @@ export function ThreadInbox({
   const now = nowMinute * 60_000;
   const [showSnoozed, setShowSnoozed] = useState(false);
   const [showSettled, setShowSettled] = useState(false);
+  const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const projectNameById = useMemo(
     () => new Map(projects.map((project) => [project.id, project.name])),
     [projects],
   );
 
-  const { pinned, inbox, snoozed, settled } = useMemo(() => {
-    const scoped = filterByProject(
+  const { pinned, inbox, snoozed, settled, scoped } = useMemo(() => {
+    const visible = filterByProject(
       visibleInboxThreads(threads),
       scope === ALL_PROJECTS ? null : scope,
     );
-    // Children live in their parent's header chip instead of the flat list;
-    // an orphan whose parent is not on screen stays here.
-    const matched = searchThreadsByTitle(
-      hideChildrenOfVisibleParents(scoped),
-      searchQuery,
-    );
+    const roots = hideChildrenOfVisibleParents(visible);
+    const matched = searchThreadGroupsByTitle(roots, visible, searchQuery);
     const active: typeof matched = [];
     const onSnoozeShelf: typeof matched = [];
     const onSettledShelf: typeof matched = [];
     for (const thread of matched) {
-      const shelf = lifecycle.shelfFor(thread);
+      const descendants = descendantsOf(visible, thread.id);
+      const shelf = lifecycle.shelfFor(thread, descendants);
       if (shelf === "snoozed") onSnoozeShelf.push(thread);
       else if (shelf === "settled") onSettledShelf.push(thread);
       else active.push(thread);
     }
     const split = partitionPinned(active);
     return {
+      scoped: visible,
       pinned: sortByCreatedAtDescending(split.pinned),
       inbox: sortByCreatedAtDescending(split.inbox),
       // Soonest wake first: "what comes back next" is the shelf's question.
@@ -103,6 +108,67 @@ export function ThreadInbox({
     scope === ALL_PROJECTS
       ? "All projects"
       : (projectNameById.get(scope) ?? "All projects");
+
+  const toggleChildren = (threadId: string) => {
+    setExpandedParents((current) => {
+      const next = new Set(current);
+      if (next.has(threadId)) next.delete(threadId);
+      else next.add(threadId);
+      return next;
+    });
+  };
+
+  const renderThreadGroup = (thread: PluginSidebarThread) => {
+    const directChildren = childrenOf(scoped, thread.id);
+    const descendants = descendantsOf(scoped, thread.id);
+    const activeInsideGroup = descendants.some(
+      (candidate) => candidate.id === activeThreadId,
+    );
+    const matchingChild =
+      searchQuery.trim().length > 0 &&
+      searchThreadsByTitle(directChildren, searchQuery).length > 0;
+    const expanded =
+      directChildren.length > 0 &&
+      (expandedParents.has(thread.id) || activeInsideGroup || matchingChild);
+
+    return (
+      <ThreadCard
+        key={thread.id}
+        thread={thread}
+        statusThread={statusSourceForGroup(thread, descendants)}
+        projectName={projectNameById.get(thread.projectId) ?? null}
+        isActive={thread.id === activeThreadId}
+        canPark={lifecycle.canPark(thread, descendants)}
+        onNavigate={onNavigate}
+        onSettle={() => lifecycle.settle(thread.id)}
+        onSnooze={(until) => lifecycle.snooze(thread.id, until)}
+        now={now}
+        childCount={directChildren.length}
+        childrenExpanded={expanded}
+        onToggleChildren={
+          directChildren.length > 0 ? () => toggleChildren(thread.id) : undefined
+        }
+      >
+        {expanded ? (
+          <ul
+            aria-label={`Child threads of ${threadDisplayTitle(thread)}`}
+            className="ml-3 flex flex-col gap-px border-l border-sidebar-border pl-1"
+          >
+            {directChildren.map((child) => (
+              <ChildThreadRow
+                key={child.id}
+                thread={child}
+                isActive={child.id === activeThreadId}
+                onNavigate={onNavigate}
+                now={now}
+                childCount={childrenOf(scoped, child.id).length}
+              />
+            ))}
+          </ul>
+        ) : null}
+      </ThreadCard>
+    );
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -154,37 +220,11 @@ export function ThreadInbox({
         ) : (
           <>
             {pinned.length > 0 ? (
-              <Shelf label="Pinned">
-                {pinned.map((thread) => (
-                  <ThreadCard
-                    key={thread.id}
-                    thread={thread}
-                    projectName={projectNameById.get(thread.projectId) ?? null}
-                    isActive={thread.id === activeThreadId}
-                    canPark={lifecycle.canPark(thread)}
-                    onNavigate={onNavigate}
-                    onSettle={() => lifecycle.settle(thread.id)}
-                    onSnooze={(until) => lifecycle.snooze(thread.id, until)}
-                    now={now}
-                  />
-                ))}
-              </Shelf>
+              <Shelf label="Pinned">{pinned.map(renderThreadGroup)}</Shelf>
             ) : null}
             {inbox.length > 0 ? (
               <Shelf label={pinned.length > 0 ? "Inbox" : null}>
-                {inbox.map((thread) => (
-                  <ThreadCard
-                    key={thread.id}
-                    thread={thread}
-                    projectName={projectNameById.get(thread.projectId) ?? null}
-                    isActive={thread.id === activeThreadId}
-                    canPark={lifecycle.canPark(thread)}
-                    onNavigate={onNavigate}
-                    onSettle={() => lifecycle.settle(thread.id)}
-                    onSnooze={(until) => lifecycle.snooze(thread.id, until)}
-                    now={now}
-                  />
-                ))}
+                {inbox.map(renderThreadGroup)}
               </Shelf>
             ) : null}
             <ParkedShelf

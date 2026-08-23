@@ -139,6 +139,52 @@ describe("ThreadInbox", () => {
     });
   });
 
+  it("nests direct children under collapsible parent cards", () => {
+    render([
+      thread({ id: "parent", title: "Parent", createdAt: 2 }),
+      thread({
+        id: "child",
+        title: "Delegated review",
+        parentThreadId: "parent",
+        createdAt: 3,
+      }),
+    ]);
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.queryByText("Delegated review")).toBeNull();
+    fireEvent.click(screen.getByLabelText("Show 1 child thread"));
+    const children = screen.getByRole("list", {
+      name: "Child threads of Parent",
+    });
+    const childLink = within(children).getByRole("link", {
+      name: "Delegated review",
+    });
+    expect(childLink.hasAttribute("data-sidebar-thread-shortcut-target")).toBe(
+      false,
+    );
+    expect(childLink.hasAttribute("data-sidebar-thread-id")).toBe(false);
+  });
+
+  it("exposes only top-level threads to numbered host shortcuts", () => {
+    render([
+      thread({ id: "parent", title: "Parent", createdAt: 3 }),
+      thread({ id: "sibling", title: "Sibling", createdAt: 2 }),
+      thread({
+        id: "child",
+        title: "Child",
+        parentThreadId: "parent",
+        createdAt: 1,
+      }),
+    ]);
+    fireEvent.click(screen.getByLabelText("Show 1 child thread"));
+    const shortcutIds = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "[data-sidebar-thread-shortcut-target]",
+      ),
+      (element) => element.dataset.sidebarThreadId,
+    );
+    expect(shortcutIds).toEqual(["parent", "sibling"]);
+  });
+
   it("separates pinned threads from the inbox", () => {
     render([
       thread({ id: "a", title: "Plain" }),
