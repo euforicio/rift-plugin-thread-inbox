@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -15,6 +15,16 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 // empty runtime first.
 const app = await loadPluginApp(() => import("../app"));
 const inbox = app.threadLists[0]!;
+
+beforeAll(() => {
+  // Radix Popover observes its floating content in browsers; jsdom does not
+  // implement ResizeObserver.
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
 
 function thread(
   overrides: Partial<PluginSidebarThread> = {},
@@ -330,7 +340,46 @@ describe("parking threads", () => {
     // Rendered (not merely accepted as props): a card whose park controls
     // never mount leaves the whole feature unreachable.
     expect(await screen.findByLabelText("Settle thread")).toBeDefined();
-    expect(screen.getByLabelText("Snooze until tomorrow")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Snooze thread" })).toBeDefined();
+  });
+
+  it("offers context-aware snooze durations and snoozes the selected time", async () => {
+    let snoozed: { threadId: string; snoozedUntil: number } | null = null;
+    renderSlot(inbox, listProps, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [thread({ id: "thr_snooze", title: "Quiet" })],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: {
+        listLifecycle: () => ({ rows: [] }),
+        snooze: (input) => {
+          snoozed = input as { threadId: string; snoozedUntil: number };
+          return { ok: true };
+        },
+      },
+    });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Snooze thread" }),
+    );
+    const content = await screen.findByRole("dialog", {
+      name: "Snooze thread",
+    });
+    expect(content.getAttribute("data-bb-plugin-root")).toBe("");
+    expect(content.getAttribute("data-bb-portaled-overlay")).toBe("");
+    expect(within(content).getByText("Snooze until")).toBeDefined();
+    expect(within(content).getByText("In 1 hour")).toBeDefined();
+    expect(within(content).getByText("Tomorrow")).toBeDefined();
+    expect(within(content).getByText("Next week")).toBeDefined();
+
+    fireEvent.click(within(content).getByText("In 1 hour"));
+    await waitFor(() => {
+      expect(snoozed).not.toBeNull();
+      expect(snoozed!.threadId).toBe("thr_snooze");
+      expect(snoozed!.snoozedUntil).toBeGreaterThan(Date.now() + 59 * 60_000);
+      expect(snoozed!.snoozedUntil).toBeLessThan(Date.now() + 61 * 60_000);
+    });
   });
 
   it("settles a thread when the user clicks Settle", async () => {
@@ -492,7 +541,9 @@ describe("card metadata", () => {
         } as never,
       },
     });
-    fireEvent.pointerDown(await screen.findByLabelText("Snooze until tomorrow"));
+    fireEvent.pointerDown(
+      await screen.findByRole("button", { name: "Snooze thread" }),
+    );
     fireEvent.pointerDown(screen.getByLabelText("Settle thread"));
     fireEvent.pointerDown(screen.getByRole("link", { name: "#412" }));
     expect(rendered.sidebarActionCalls).not.toContainEqual({

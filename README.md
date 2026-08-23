@@ -35,6 +35,7 @@ bb plugin update t3sidebar-nested
 - Opening or searching for a child expands its parent.
 - Live descendant work prevents the parent from being parked.
 - Deeper descendants remain accessible through thread-header controls.
+- Snooze offers context-aware presets for one hour, this evening, tomorrow, or next week.
 - Snoozed and settled groups stay in collapsed shelves.
 
 MIT licensed; see [LICENSE](LICENSE).

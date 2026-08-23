@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -7,6 +8,7 @@ import {
   type PointerEventHandler,
   type ReactNode,
 } from "react";
+import * as Popover from "@radix-ui/react-popover";
 import {
   experimental_useSidebarThreadPullRequest as useSidebarThreadPullRequest,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
@@ -15,6 +17,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { Icon, type IconName } from "./components/Icon";
 import { cn } from "./lib/utils";
+import { usePortalScopeProps } from "./lib/portal-scope";
 import { RowContextMenu } from "./RowContextMenu";
 import { ProviderGlyph } from "./ProviderGlyph";
 import { STATUS_SLOT_CLASS, StatusOrTime } from "./StatusSlot";
@@ -53,6 +56,12 @@ export function ThreadCard({
   const actions = useSidebarThreadActions();
   const { splitProps, layout } = useSidebarThreadSplit(thread.id);
   const { pullRequest } = useSidebarThreadPullRequest(thread.id);
+  // Keep the hover controls visible while their portalled snooze menu is open.
+  // Otherwise moving the pointer into the menu makes the trigger disappear.
+  const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!canPark) setSnoozeMenuOpen(false);
+  }, [canPark]);
   const openThread = (
     event: Pick<MouseEvent | KeyboardEvent, "preventDefault" | "metaKey" | "ctrlKey">,
   ) => {
@@ -93,18 +102,27 @@ export function ThreadCard({
               {threadDisplayTitle(thread)}
             </span>
             {canPark ? (
-              <span className="pointer-events-auto hidden items-center gap-0.5 group-hover/card:flex">
-                <ParkButton
-                  label="Snooze until tomorrow"
-                  icon="Clock"
-                  onActivate={() =>
-                    onSnooze(resolveSnoozePresets(new Date())[2]!.snoozedUntil)
-                  }
+              <span
+                className={cn(
+                  "pointer-events-auto items-center gap-0.5",
+                  snoozeMenuOpen ? "flex" : "hidden group-hover/card:flex",
+                )}
+              >
+                <SnoozeMenu
+                  open={snoozeMenuOpen}
+                  onOpenChange={setSnoozeMenuOpen}
+                  onSnooze={onSnooze}
                 />
                 <ParkButton label="Settle thread" icon="Check" onActivate={onSettle} />
               </span>
             ) : null}
-            <span className={cn(STATUS_SLOT_CLASS, canPark && "group-hover/card:hidden")}>
+            <span
+              className={cn(
+                STATUS_SLOT_CLASS,
+                canPark && "group-hover/card:hidden",
+                snoozeMenuOpen && "hidden",
+              )}
+            >
               <StatusOrTime thread={statusThread} now={now} />
             </span>
           </div>
@@ -357,6 +375,87 @@ function MetadataLabel({
       ) : null}
     </>
   );
+}
+
+function SnoozeMenu({
+  open,
+  onOpenChange,
+  onSnooze,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSnooze: (snoozedUntil: number) => void;
+}) {
+  // Resolve relative options when the menu opens, rather than when the row
+  // mounts, so “In 1 hour” always means one hour from the user's click.
+  const presets = useMemo(
+    () => (open ? resolveSnoozePresets(new Date()) : []),
+    [open],
+  );
+
+  return (
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Snooze thread"
+          title="Snooze thread"
+          onClick={(event) => event.stopPropagation()}
+          className="rounded p-0.5 text-muted-foreground hover:text-foreground data-[state=open]:text-foreground"
+        >
+          <Icon name="Clock" className="size-3.5" />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          {...usePortalScopeProps()}
+          side="bottom"
+          align="end"
+          sideOffset={4}
+          aria-label="Snooze thread"
+          className="z-50 w-52 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <p className="px-2 pb-1 pt-1 text-2xs font-medium text-muted-foreground">
+            Snooze until
+          </p>
+          {presets.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onOpenChange(false);
+                onSnooze(preset.snoozedUntil);
+              }}
+              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground outline-none hover:bg-accent focus-visible:bg-accent"
+            >
+              <span className="min-w-0 flex-1">{preset.label}</span>
+              <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground/70">
+                {snoozePresetWhenLabel(preset.id, preset.snoozedUntil)}
+              </span>
+            </button>
+          ))}
+          <Popover.Arrow className="fill-border" />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function snoozePresetWhenLabel(
+  id: ReturnType<typeof resolveSnoozePresets>[number]["id"],
+  snoozedUntil: number,
+): string {
+  const wake = new Date(snoozedUntil);
+  const time = wake.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  if (id !== "next-week") return time;
+  const weekday = wake.toLocaleDateString(undefined, { weekday: "short" });
+  return `${weekday} ${time}`;
 }
 
 function ParkButton({
