@@ -404,7 +404,7 @@ describe("card metadata", () => {
     ).toBeTruthy();
   });
 
-  it("forwards split dragging from the metadata row", () => {
+  it("forwards split dragging from the whole card, including metadata", () => {
     const rendered = render([
       thread({
         id: "thr_drag",
@@ -416,7 +416,8 @@ describe("card metadata", () => {
         },
       }),
     ]);
-    fireEvent.pointerDown(screen.getByRole("link", { name: "bb · main" }));
+    const identity = screen.getByRole("link", { name: "bb · main" });
+    fireEvent.pointerDown(identity);
     expect(rendered.sidebarActionCalls).toContainEqual({
       method: "open",
       threadId: "thr_drag",
