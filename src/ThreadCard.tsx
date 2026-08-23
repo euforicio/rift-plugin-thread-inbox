@@ -2,7 +2,9 @@ import {
   useEffect,
   useRef,
   useState,
+  type KeyboardEvent,
   type MouseEvent,
+  type PointerEventHandler,
 } from "react";
 import {
   experimental_useSidebarThreadPullRequest as useSidebarThreadPullRequest,
@@ -40,7 +42,9 @@ export function ThreadCard({
   const actions = useSidebarThreadActions();
   const { splitProps, layout } = useSidebarThreadSplit(thread.id);
   const { pullRequest } = useSidebarThreadPullRequest(thread.id);
-  const openThread = (event: MouseEvent) => {
+  const openThread = (
+    event: Pick<MouseEvent | KeyboardEvent, "preventDefault" | "metaKey" | "ctrlKey">,
+  ) => {
     event.preventDefault();
     actions.open(thread.id, { split: event.metaKey || event.ctrlKey });
     onNavigate();
@@ -102,6 +106,7 @@ export function ThreadCard({
               branchName={thread.environment?.branchName ?? null}
               hostName={thread.host?.name ?? null}
               onOpen={openThread}
+              onSplitPointerDown={splitProps.onPointerDown}
             />
             {thread.activity.workflows > 0 ? (
               <ActivityCount label="workflows" count={thread.activity.workflows} />
@@ -147,11 +152,15 @@ function MetadataIdentity({
   branchName,
   hostName,
   onOpen,
+  onSplitPointerDown,
 }: {
   projectName: string | null;
   branchName: string | null;
   hostName: string | null;
-  onOpen: (event: MouseEvent) => void;
+  onOpen: (
+    event: Pick<MouseEvent | KeyboardEvent, "preventDefault" | "metaKey" | "ctrlKey">,
+  ) => void;
+  onSplitPointerDown?: PointerEventHandler<HTMLElement>;
 }) {
   const detail = branchName ?? hostName;
   const fullLabel = [projectName, detail].filter(Boolean).join(" · ");
@@ -200,39 +209,65 @@ function MetadataIdentity({
     animationFrame.current = requestAnimationFrame(step);
   };
 
+  const scrollerFor = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>("[data-thread-card-identity-scroll]");
+
+  const prefersReducedMotion = () =>
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const startReveal = (container: HTMLElement) => {
+    setIsReturning(false);
+    const scroller = scrollerFor(container);
+    if (!scroller) return;
+    const overflow = scroller.scrollWidth - scroller.clientWidth;
+    if (overflow <= 0) return;
+    if (prefersReducedMotion()) {
+      scroller.scrollLeft = overflow;
+      return;
+    }
+    hoverTimer.current = setTimeout(() => {
+      const duration = Math.min(2_400, Math.max(1_200, overflow * 12));
+      animateScroll(scroller, overflow, duration);
+    }, 250);
+  };
+
+  const returnToStart = (container: HTMLElement) => {
+    const scroller = scrollerFor(container);
+    if (!scroller || scroller.scrollLeft <= 0) {
+      stopMotion();
+      setIsReturning(false);
+      return;
+    }
+    if (prefersReducedMotion()) {
+      stopMotion();
+      scroller.scrollLeft = 0;
+      setIsReturning(false);
+      return;
+    }
+    setIsReturning(true);
+    animateScroll(scroller, 0, 500, () => setIsReturning(false));
+  };
+
   useEffect(() => stopMotion, []);
 
   return (
     <span
       data-thread-card-identity=""
       aria-label={fullLabel || undefined}
-      className="group/metadata pointer-events-auto relative min-w-0 flex-1 cursor-pointer overflow-hidden whitespace-nowrap"
+      title={fullLabel || undefined}
+      role="link"
+      tabIndex={0}
+      className="group/metadata pointer-events-auto relative min-w-0 flex-1 cursor-pointer overflow-hidden whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
       onClick={onOpen}
-      onMouseEnter={(event) => {
-        setIsReturning(false);
-        const scroller = event.currentTarget.querySelector<HTMLElement>(
-          "[data-thread-card-identity-scroll]",
-        );
-        if (!scroller) return;
-        const overflow = scroller.scrollWidth - scroller.clientWidth;
-        if (overflow <= 0) return;
-        hoverTimer.current = setTimeout(() => {
-          const duration = Math.min(2_400, Math.max(1_200, overflow * 12));
-          animateScroll(scroller, overflow, duration);
-        }, 250);
+      onPointerDown={onSplitPointerDown}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onOpen(event);
       }}
-      onMouseLeave={(event) => {
-        const scroller = event.currentTarget.querySelector<HTMLElement>(
-          "[data-thread-card-identity-scroll]",
-        );
-        if (scroller && scroller.scrollLeft > 0) {
-          setIsReturning(true);
-          animateScroll(scroller, 0, 500, () => setIsReturning(false));
-        } else {
-          stopMotion();
-          setIsReturning(false);
-        }
-      }}
+      onMouseEnter={(event) => startReveal(event.currentTarget)}
+      onFocus={(event) => startReveal(event.currentTarget)}
+      onMouseLeave={(event) => returnToStart(event.currentTarget)}
+      onBlur={(event) => returnToStart(event.currentTarget)}
     >
       <span
         data-thread-card-identity-text=""

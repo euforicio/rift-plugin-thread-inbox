@@ -99,7 +99,7 @@ describe("ThreadInbox", () => {
   // A plugin that drops these attributes silently breaks nine host shortcuts.
   it("marks every row as a host shortcut target", () => {
     render([thread({ id: "thr_x" })]);
-    const row = screen.getByRole("link");
+    const row = screen.getByRole("link", { name: "A thread" });
     expect(row.hasAttribute("data-sidebar-thread-shortcut-target")).toBe(true);
     expect(row.getAttribute("data-sidebar-thread-id")).toBe("thr_x");
   });
@@ -118,7 +118,7 @@ describe("ThreadInbox", () => {
         rpc: { listLifecycle: () => ({ rows: [] }) },
       },
     );
-    fireEvent.click(screen.getByRole("link"));
+    fireEvent.click(screen.getByRole("link", { name: "A thread" }));
     expect(rendered.sidebarActionCalls).toContainEqual({
       method: "open",
       threadId: "thr_open",
@@ -129,7 +129,9 @@ describe("ThreadInbox", () => {
 
   it("opens in a split with the platform modifier held", () => {
     const rendered = render([thread({ id: "thr_split" })]);
-    fireEvent.click(screen.getByRole("link"), { metaKey: true });
+    fireEvent.click(screen.getByRole("link", { name: "A thread" }), {
+      metaKey: true,
+    });
     expect(rendered.sidebarActionCalls).toContainEqual({
       method: "open",
       threadId: "thr_split",
@@ -383,6 +385,9 @@ describe("card metadata", () => {
     expect(primary).not.toBeNull();
     expect(metadata).not.toBeNull();
     expect(identity.className).toContain("pointer-events-auto");
+    expect(identity.getAttribute("role")).toBe("link");
+    expect(identity.getAttribute("tabindex")).toBe("0");
+    expect(identity.getAttribute("title")).toBe("bb · main");
     expect(
       metadata?.querySelector("[data-thread-card-identity-text]")?.className,
     ).toContain("truncate");
@@ -397,6 +402,52 @@ describe("card metadata", () => {
       primary!.compareDocumentPosition(metadata!) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("forwards split dragging from the metadata row", () => {
+    const rendered = render([
+      thread({
+        id: "thr_drag",
+        environment: {
+          id: "env_1",
+          name: null,
+          branchName: "main",
+          workspaceDisplayKind: "managed-worktree",
+        },
+      }),
+    ]);
+    fireEvent.pointerDown(screen.getByRole("link", { name: "bb · main" }));
+    expect(rendered.sidebarActionCalls).toContainEqual({
+      method: "open",
+      threadId: "thr_drag",
+    });
+  });
+
+  it("opens metadata with keyboard and modifier clicks", () => {
+    const rendered = render([
+      thread({
+        id: "thr_meta",
+        environment: {
+          id: "env_1",
+          name: null,
+          branchName: "main",
+          workspaceDisplayKind: "managed-worktree",
+        },
+      }),
+    ]);
+    const identity = screen.getByRole("link", { name: "bb · main" });
+    fireEvent.keyDown(identity, { key: "Enter" });
+    fireEvent.click(identity, { ctrlKey: true });
+    expect(rendered.sidebarActionCalls).toContainEqual({
+      method: "open",
+      threadId: "thr_meta",
+      options: { split: false },
+    });
+    expect(rendered.sidebarActionCalls).toContainEqual({
+      method: "open",
+      threadId: "thr_meta",
+      options: { split: true },
+    });
   });
 
   it("always shows the provider glyph, even without a branch", async () => {
