@@ -1,17 +1,38 @@
-# T3 Sidebar
+# T3 Sidebar — WYEZ fork
 
-An inbox-style replacement for bb's sidebar thread list, and the reference
-example for `app.slots.experimental_threadList`.
+An inbox-style replacement for bb's sidebar thread list. This repository is a
+fork of [Sawyer Hood's T3 Sidebar](https://github.com/SawyerHood/bb-plugin-t3sidebar),
+which began as the reference `app.slots.experimental_threadList` example in the
+BB repository.
 
-This plugin started as an example in the BB repository. Install its public
-release from GitHub:
+## What's changed in this fork
+
+- Compact two-line cards: title and status first, `project · branch` second.
+- Correct greyscale provider marks for Codex, Claude Code, Pi, Cursor, Grok
+  Build, opencode, and oh-my-pi, plus sensible unknown-provider fallbacks.
+- Branch metadata uses a subdued code font.
+- Long metadata scrolls smoothly on hover and animates back on mouse leave.
+
+The original inbox ordering, pinned/snoozed/settled shelves, context menu, and
+parent/child header navigation are retained.
+
+## Install
+
+Install this fork from its tracked `main` branch:
 
 ```sh
 bb plugin install git:https://github.com/wy3z/bb-plugin-t3sidebar.git@main
 ```
 
-Turn it on in **Settings → Appearance → Sidebar**. bb's own list stays the
-default, and comes back the moment you switch away or disable this plugin.
+To receive later updates:
+
+```sh
+bb plugin outdated
+bb plugin update t3sidebar
+```
+
+Then select **T3 Sidebar** under **Settings → Appearance → Sidebar**. BB's own
+list remains available whenever you switch away from or disable the plugin.
 
 The plugin replaces the scrolling list only. bb's New-thread button, search
 field, plugin nav rows, and footer stay exactly where they are — this list
