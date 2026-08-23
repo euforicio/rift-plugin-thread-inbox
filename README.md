@@ -1,4 +1,4 @@
-# T3 Sidebar — WYEZ fork
+# T3 Sidebar - Nested Child Threads fork
 
 [![CI](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml/badge.svg)](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml)
 
