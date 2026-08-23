@@ -20,12 +20,12 @@ A compact inbox-style sidebar for BB, forked from
 bb plugin install git:https://github.com/wy3z/bb-plugin-t3sidebar.git@main
 ```
 
-Select **T3 Sidebar** under **Settings → Appearance → Sidebar**.
+Select **T3 Sidebar (Nested)** under **Settings → Appearance → Sidebar**.
 
 Update later with:
 
 ```sh
-bb plugin update t3sidebar
+bb plugin update t3sidebar-nested
 ```
 
 ## Behavior

@@ -1,4 +1,4 @@
-// bb-plugin-t3sidebar — a stable inbox-style replacement for BB's sidebar
+// bb-plugin-t3sidebar-nested — a stable inbox-style replacement for BB's sidebar
 // thread list, with child threads nested under the parent that spawned them.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ThreadInbox } from "./src/ThreadInbox";
@@ -8,7 +8,7 @@ import { SubagentsChip } from "./src/SubagentsChip";
 export default definePluginApp((app) => {
   app.slots.experimental_threadList({
     id: "inbox",
-    title: "T3 Sidebar",
+    title: "T3 Sidebar (Nested)",
     description:
       "Stable inbox cards, newest first, with collapsible child threads.",
     component: ThreadInbox,

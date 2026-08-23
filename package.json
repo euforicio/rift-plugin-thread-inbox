@@ -1,6 +1,6 @@
 {
-  "name": "bb-plugin-t3sidebar",
-  "version": "0.2.0",
+  "name": "bb-plugin-t3sidebar-nested",
+  "version": "0.2.1",
   "type": "module",
   "description": "A stable inbox sidebar with collapsible nested child threads.",
   "license": "MIT",
@@ -14,7 +14,7 @@
     "bbPluginSdk": ">=0.4.3"
   },
   "bb": {
-    "name": "T3 Sidebar",
+    "name": "T3 Sidebar (Nested)",
     "description": "Stable inbox ordering with collapsible nested child threads.",
     "branding": {
       "icon": "PanelLeft"

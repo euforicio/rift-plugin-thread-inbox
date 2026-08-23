@@ -1,4 +1,4 @@
-// bb-plugin-t3sidebar backend — the settled / snoozed store.
+// bb-plugin-t3sidebar-nested backend — the settled / snoozed store.
 //
 // This state lives in the plugin's own SQLite database, never on bb's thread.
 // Putting it on the thread would mean a schema change, a wire change, and a
