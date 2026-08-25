@@ -68,6 +68,7 @@ const listProps = {
   isCompactViewport: false,
   onNavigate: () => {},
   searchQuery: "",
+  experimental_Original: () => null,
 };
 
 function render(
@@ -92,6 +93,88 @@ describe("t3sidebar registration", () => {
 });
 
 describe("ThreadInbox", () => {
+  it("keeps an old parent active while a child is working", async () => {
+    renderSlot(inbox, listProps, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [
+          thread({ id: "parent", title: "Old parent", createdAt: 1, updatedAt: 1, latestAttentionAt: 1 }),
+          thread({ id: "child", title: "Live child", parentThreadId: "parent", createdAt: 1, updatedAt: 1, latestAttentionAt: 1, indicator: "runtime" }),
+        ],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: {
+        listLifecycle: () => ({ rows: [] }),
+        getSidebarSettings: () => ({ inactiveThreadsEnabled: true, inactiveAfterHours: 1 }),
+      },
+    });
+    expect(await screen.findByText("Old parent")).toBeDefined();
+    expect(screen.queryByRole("region", { name: "Inactive" })).toBeNull();
+  });
+
+  it("keeps a matching inactive child accessible inside its parent", async () => {
+    renderSlot(inbox, { ...listProps, searchQuery: "needle" }, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [
+          thread({ id: "parent", title: "Old parent", createdAt: 1, updatedAt: 1, latestAttentionAt: 1 }),
+          thread({ id: "child", title: "Needle child", parentThreadId: "parent", createdAt: 1, updatedAt: 1, latestAttentionAt: 1 }),
+        ],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: {
+        listLifecycle: () => ({ rows: [] }),
+        getSidebarSettings: () => ({ inactiveThreadsEnabled: true, inactiveAfterHours: 1 }),
+      },
+    });
+    const shelf = await screen.findByRole("region", { name: "Inactive" });
+    expect(within(shelf).getByRole("button", { name: /Inactive/ }).getAttribute("aria-expanded")).toBe("true");
+    expect(within(shelf).getByRole("link", { name: "Needle child" })).toBeDefined();
+  });
+
+  it("auto-expands inactive groups containing the active child", async () => {
+    renderSlot(inbox, { ...listProps, activeThreadId: "child" }, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [
+          thread({ id: "parent", title: "Inactive parent", createdAt: 1, updatedAt: 1, latestAttentionAt: 1 }),
+          thread({ id: "child", title: "Active child", parentThreadId: "parent", createdAt: 1, updatedAt: 1, latestAttentionAt: 1 }),
+        ],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: {
+        listLifecycle: () => ({ rows: [] }),
+        getSidebarSettings: () => ({ inactiveThreadsEnabled: true, inactiveAfterHours: 1 }),
+      },
+    });
+    const shelf = await screen.findByRole("region", { name: "Inactive" });
+    expect(within(shelf).getByRole("link", { name: "Active child" })).toBeDefined();
+  });
+
+  it("shows and acknowledges a parent woken by descendant attention", async () => {
+    let acknowledged: string | null = null;
+    renderSlot(inbox, listProps, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [
+          thread({ id: "parent", title: "Woken parent", latestAttentionAt: 100 }),
+          thread({ id: "child", title: "Attentive child", parentThreadId: "parent", latestAttentionAt: 300 }),
+        ],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: {
+        listLifecycle: () => ({ rows: [{ threadId: "parent", settledAt: null, snoozedUntil: Date.now() + 60_000, snoozedAt: 200 }] }),
+        acknowledgeWake: (input) => {
+          acknowledged = (input as { threadId: string }).threadId;
+          return { ok: true };
+        },
+      },
+    });
+    expect(await screen.findByText("Woken")).toBeDefined();
+    fireEvent.click(screen.getByRole("link", { name: "Woken parent" }));
+    await waitFor(() => expect(acknowledged).toBe("parent"));
+  });
+
   it("lists threads newest first", () => {
     render([
       thread({ id: "a", title: "Older", createdAt: 1 }),
@@ -103,6 +186,51 @@ describe("ThreadInbox", () => {
       .map((row) => row.textContent);
     expect(titles[0]).toContain("Newer");
     expect(titles[1]).toContain("Older");
+  });
+
+  it("keeps bulk selection until settle RPC completion", async () => {
+    let resolveSettle!: (value: { ok: boolean }) => void;
+    const settle = new Promise<{ ok: boolean }>((resolve) => { resolveSettle = resolve; });
+    renderSlot(inbox, listProps, {
+      sidebarThreads: {
+        status: "ready",
+        threads: [thread({ id: "bulk", title: "Bulk target" })],
+        projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+      },
+      rpc: {
+        listLifecycle: () => ({ rows: [] }),
+        settle: () => settle,
+      },
+    });
+    fireEvent.click(screen.getByRole("link", { name: "Bulk target" }), { altKey: true });
+    expect(screen.getByRole("link", { name: "Bulk target, selected" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Settle" }));
+    expect(screen.getByRole("toolbar", { name: "1 threads selected" })).toBeDefined();
+    resolveSettle({ ok: true });
+    await waitFor(() => expect(screen.queryByRole("toolbar", { name: "1 threads selected" })).toBeNull());
+  });
+
+  it("exposes bulk selection from the keyboard", () => {
+    render([thread({ id: "keyboard-select", title: "Keyboard target" })]);
+    fireEvent.keyDown(screen.getByRole("link", { name: "Keyboard target" }), {
+      key: " ",
+      ctrlKey: true,
+    });
+    expect(
+      screen.getByRole("link", { name: "Keyboard target, selected" }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("toolbar", { name: "1 threads selected" }),
+    ).toBeDefined();
+  });
+
+  it("allows pointer interaction with the inline rename input", () => {
+    render([thread({ id: "rename", title: "Rename me" })]);
+    fireEvent.doubleClick(screen.getByText("Rename me"));
+    const input = screen.getByRole("textbox", { name: "Rename Rename me" });
+    expect(input.className).toContain("pointer-events-auto");
+    fireEvent.click(input);
+    expect(document.activeElement).toBe(input);
   });
 
   // The DOM contract behind numbered thread shortcuts and thread.next/previous.
@@ -172,6 +300,30 @@ describe("ThreadInbox", () => {
       false,
     );
     expect(childLink.hasAttribute("data-sidebar-thread-id")).toBe(false);
+  });
+
+  it("keeps multi-digit child counts fully visible", () => {
+    render([
+      thread({ id: "parent", title: "Parent", createdAt: 20 }),
+      ...Array.from({ length: 12 }, (_, index) =>
+        thread({
+          id: `child-${index}`,
+          title: `Child ${index + 1}`,
+          parentThreadId: "parent",
+          createdAt: index,
+        }),
+      ),
+    ]);
+
+    const toggle = screen.getByLabelText("Show 12 child threads");
+    const count = within(toggle).getByText("12");
+    const trailing = toggle.parentElement;
+
+    expect(toggle.classList.contains("shrink-0")).toBe(true);
+    expect(count.classList.contains("truncate")).toBe(false);
+    expect(count.classList.contains("whitespace-nowrap")).toBe(true);
+    expect(trailing?.classList.contains("min-w-12")).toBe(true);
+    expect(trailing?.classList.contains("w-12")).toBe(false);
   });
 
   it("exposes only top-level threads to numbered host shortcuts", () => {
@@ -343,7 +495,7 @@ describe("parking threads", () => {
     expect(screen.getByRole("button", { name: "Snooze thread" })).toBeDefined();
   });
 
-  it("offers context-aware snooze durations and snoozes the selected time", async () => {
+  it("offers compact snooze durations and snoozes the selected time", async () => {
     let snoozed: { threadId: string; snoozedUntil: number } | null = null;
     renderSlot(inbox, listProps, {
       sidebarThreads: {
@@ -368,17 +520,18 @@ describe("parking threads", () => {
     });
     expect(content.getAttribute("data-bb-plugin-root")).toBe("");
     expect(content.getAttribute("data-bb-portaled-overlay")).toBe("");
-    expect(within(content).getByText("Snooze until")).toBeDefined();
-    expect(within(content).getByText("In 1 hour")).toBeDefined();
-    expect(within(content).getByText("Tomorrow")).toBeDefined();
-    expect(within(content).getByText("Next week")).toBeDefined();
+    expect(within(content).queryByText("Snooze until")).toBeNull();
+    expect(within(content).getByText("30 minutes")).toBeDefined();
+    expect(within(content).getByText("2 hours")).toBeDefined();
+    expect(within(content).getByText("1 day")).toBeDefined();
+    expect(within(content).getByText("1 week")).toBeDefined();
 
-    fireEvent.click(within(content).getByText("In 1 hour"));
+    fireEvent.click(within(content).getByText("30 minutes"));
     await waitFor(() => {
       expect(snoozed).not.toBeNull();
       expect(snoozed!.threadId).toBe("thr_snooze");
-      expect(snoozed!.snoozedUntil).toBeGreaterThan(Date.now() + 59 * 60_000);
-      expect(snoozed!.snoozedUntil).toBeLessThan(Date.now() + 61 * 60_000);
+      expect(snoozed!.snoozedUntil).toBeGreaterThan(Date.now() + 29 * 60_000);
+      expect(snoozed!.snoozedUntil).toBeLessThan(Date.now() + 31 * 60_000);
     });
   });
 
@@ -442,7 +595,7 @@ describe("row context menu", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["Open in split", "Mark unread", "Pin", "Archive", "Delete"]);
+    ).toEqual(["Open in split", "Rename", "Mark unread", "Pin", "Archive", "Delete"]);
   });
 
   it("routes deletion through the host's confirmation", async () => {
@@ -603,16 +756,14 @@ describe("card metadata", () => {
     expect(await screen.findByLabelText("some-new-agent")).toBeDefined();
   });
 
-  // A personal-project thread has a machine but no worktree, so the machine
-  // takes the branch's place instead of leaving the line blank.
-  it("shows the machine when the thread has no branch", async () => {
+  it("does not show the machine when the thread has no Git branch", () => {
     render([
       thread({
         id: "thr_m",
         host: { id: "host_1", name: "Sawyer's MacBook" },
       }),
     ]);
-    expect(await screen.findAllByText("Sawyer's MacBook")).toHaveLength(2);
+    expect(screen.queryByText("Sawyer's MacBook")).toBeNull();
   });
 
   it("prefers the branch over the machine when both exist", async () => {

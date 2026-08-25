@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
 import type { t3sidebarRpcContract } from "./server";
 import {
   canPark,
   nextWakeDelayMs,
+  resolveWakeReason,
   resolveShelf,
   type ThreadLifecycleRow,
   type ThreadShelf,
@@ -34,10 +35,16 @@ export interface LifecycleApi {
     descendants?: readonly PluginSidebarThread[],
   ): boolean;
   wakeAtFor(thread: PluginSidebarThread): number | null;
-  settle(threadId: string): void;
-  unsettle(threadId: string): void;
-  snooze(threadId: string, snoozedUntil: number): void;
-  unsnooze(threadId: string): void;
+  snoozedAtFor(thread: PluginSidebarThread): number | null;
+  wokeFor(
+    thread: PluginSidebarThread,
+    descendants?: readonly PluginSidebarThread[],
+  ): boolean;
+  acknowledgeWake(threadId: string, expectedSnoozedAt: number): Promise<void>;
+  settle(threadId: string): Promise<void>;
+  unsettle(threadId: string): Promise<void>;
+  snooze(threadId: string, snoozedUntil: number): Promise<void>;
+  unsnooze(threadId: string): Promise<void>;
 }
 
 /**
@@ -51,6 +58,7 @@ export function useLifecycle(
   threads: readonly PluginSidebarThread[],
 ): LifecycleApi {
   const rpc = useRpc<typeof t3sidebarRpcContract>();
+  const realtimeState = useRealtimeConnectionState();
   const [rows, setRows] = useState<ReadonlyMap<string, ThreadLifecycleRow>>(
     () => new Map(),
   );
@@ -69,7 +77,7 @@ export function useLifecycle(
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, realtimeState]);
 
   useRealtime("lifecycle", () => {
     void refresh();
@@ -113,7 +121,7 @@ export function useLifecycle(
     // One read per mutation: the write publishes on the realtime channel, and
     // that subscription already triggers a refresh for every client.
     const mutate = async (
-      method: "settle" | "unsettle" | "unsnooze",
+      method: "settle" | "unsettle" | "unsnooze" | "acknowledgeWake",
       threadId: string,
     ) => {
       await rpc.call(method, { threadId });
@@ -124,11 +132,21 @@ export function useLifecycle(
       canPark: (thread, descendants = []) =>
         canPark(signalsFor(thread, descendants)),
       wakeAtFor: (thread) => rows.get(thread.id)?.snoozedUntil ?? null,
-      settle: (threadId) => void mutate("settle", threadId),
-      unsettle: (threadId) => void mutate("unsettle", threadId),
-      unsnooze: (threadId) => void mutate("unsnooze", threadId),
-      snooze: (threadId, snoozedUntil) => {
-        void rpc.call("snooze", { threadId, snoozedUntil });
+      snoozedAtFor: (thread) => rows.get(thread.id)?.snoozedAt ?? null,
+      wokeFor: (thread, descendants = []) =>
+        resolveWakeReason(
+          rows.get(thread.id),
+          signalsFor(thread, descendants),
+          now,
+        ) !== null,
+      acknowledgeWake: async (threadId, expectedSnoozedAt) => {
+        await rpc.call("acknowledgeWake", { threadId, expectedSnoozedAt });
+      },
+      settle: (threadId) => mutate("settle", threadId),
+      unsettle: (threadId) => mutate("unsettle", threadId),
+      unsnooze: (threadId) => mutate("unsnooze", threadId),
+      snooze: async (threadId, snoozedUntil) => {
+        await rpc.call("snooze", { threadId, snoozedUntil });
       },
     };
   }, [now, refresh, rows, rpc]);

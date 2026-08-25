@@ -17,9 +17,13 @@ import { cn } from "./lib/utils";
  */
 export function RowContextMenu({
   thread,
+  onRename,
+  onOpen,
   children,
 }: {
   thread: PluginSidebarThread;
+  onRename?: () => void;
+  onOpen?: () => void;
   children: ReactNode;
 }) {
   const actions = useSidebarThreadActions();
@@ -32,9 +36,13 @@ export function RowContextMenu({
           aria-label="Thread actions"
           className="z-50 min-w-44 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
-          <Item onSelect={() => actions.open(thread.id, { split: true })}>
+          <Item onSelect={() => {
+            actions.open(thread.id, { split: true });
+            onOpen?.();
+          }}>
             Open in split
           </Item>
+          {onRename ? <Item onSelect={onRename}>Rename</Item> : null}
           <Separator />
           <Item
             onSelect={() => void actions.setRead(thread.id, thread.isUnread)}

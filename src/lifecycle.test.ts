@@ -136,49 +136,26 @@ describe("snoozeWakeLabel", () => {
   });
 
   it("reads 'now' once the wake time has passed", () => {
-    expect(snoozeWakeLabel(500, 1_000)).toBe("now");
+    expect(snoozeWakeLabel(500, 1_000)).toBe("Woken");
   });
 });
 
 describe("resolveSnoozePresets", () => {
-  it("offers this evening while it is still well before evening", () => {
-    const presets = resolveSnoozePresets(new Date(2026, 0, 5, 9, 0, 0));
-    expect(presets.map((preset) => preset.id)).toEqual([
-      "hour",
-      "evening",
-      "tomorrow",
-      "next-week",
+  it("offers the compact BB Sidebar durations", () => {
+    const now = new Date(2026, 0, 5, 9, 0, 0);
+    const presets = resolveSnoozePresets(now);
+    expect(
+      presets.map(({ id, label, snoozedUntil }) => ({
+        id,
+        label,
+        duration: snoozedUntil - now.getTime(),
+      })),
+    ).toEqual([
+      { id: "30m", label: "30 minutes", duration: 30 * 60_000 },
+      { id: "2h", label: "2 hours", duration: 2 * 60 * 60_000 },
+      { id: "1d", label: "1 day", duration: 24 * 60 * 60_000 },
+      { id: "1w", label: "1 week", duration: 7 * 24 * 60 * 60_000 },
     ]);
-  });
-
-  it("drops this evening once evening is near", () => {
-    const presets = resolveSnoozePresets(new Date(2026, 0, 5, 17, 30, 0));
-    expect(presets.map((preset) => preset.id)).toEqual([
-      "hour",
-      "tomorrow",
-      "next-week",
-    ]);
-  });
-
-  // Calendar arithmetic, not +24h: a fixed offset lands on the wrong local
-  // day across a daylight-saving change.
-  it("puts tomorrow at 9am on the next calendar day", () => {
-    const presets = resolveSnoozePresets(new Date(2026, 0, 5, 23, 30, 0));
-    const tomorrow = new Date(
-      presets.find((preset) => preset.id === "tomorrow")!.snoozedUntil,
-    );
-    expect(tomorrow.getDate()).toBe(6);
-    expect(tomorrow.getHours()).toBe(9);
-  });
-
-  it("puts next week on the coming Monday", () => {
-    // 2026-01-05 is a Monday, so "next week" is the following Monday.
-    const presets = resolveSnoozePresets(new Date(2026, 0, 5, 10, 0, 0));
-    const nextWeek = new Date(
-      presets.find((preset) => preset.id === "next-week")!.snoozedUntil,
-    );
-    expect(nextWeek.getDay()).toBe(1);
-    expect(nextWeek.getDate()).toBe(12);
   });
 });
 

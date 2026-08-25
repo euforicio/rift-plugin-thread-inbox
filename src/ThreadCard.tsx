@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type KeyboardEventHandler,
   type MouseEvent,
   type PointerEventHandler,
   type ReactNode,
@@ -23,6 +24,22 @@ import { ProviderGlyph } from "./ProviderGlyph";
 import { STATUS_SLOT_CLASS, StatusOrTime } from "./StatusSlot";
 import { threadDisplayTitle } from "./inbox";
 import { resolveSnoozePresets } from "./lifecycle";
+import { InlineThreadTitle } from "./InlineThreadTitle";
+
+export interface ThreadReorderControls {
+  disabled: boolean;
+  isDragging: boolean;
+  onPointerDown: PointerEventHandler<HTMLElement>;
+  onKeyDown: KeyboardEventHandler<HTMLAnchorElement>;
+  consumeSuppressedClick: () => boolean;
+}
+
+export type GitStatusState =
+  | "clean"
+  | "untracked"
+  | "dirty_uncommitted"
+  | "committed_unmerged"
+  | "dirty_and_committed_unmerged";
 
 export function ThreadCard({
   thread,
@@ -33,10 +50,17 @@ export function ThreadCard({
   onNavigate,
   onSettle,
   onSnooze,
+  isWoken = false,
+  onAcknowledgeWake,
   now,
   childCount = 0,
   childrenExpanded = false,
   onToggleChildren,
+  reorder,
+  gitStatus,
+  isSelected = false,
+  onSelectionClick,
+  onSelectionKeyDown,
   children,
 }: {
   thread: PluginSidebarThread;
@@ -47,10 +71,17 @@ export function ThreadCard({
   onNavigate: () => void;
   onSettle: () => void;
   onSnooze: (snoozedUntil: number) => void;
+  isWoken?: boolean;
+  onAcknowledgeWake?: () => void;
   now: number;
   childCount?: number;
   childrenExpanded?: boolean;
   onToggleChildren?: () => void;
+  reorder?: ThreadReorderControls;
+  gitStatus?: GitStatusState | null;
+  isSelected?: boolean;
+  onSelectionClick?: (event: MouseEvent<HTMLElement>) => boolean;
+  onSelectionKeyDown?: (event: KeyboardEvent<HTMLAnchorElement>) => boolean;
   children?: ReactNode;
 }) {
   const actions = useSidebarThreadActions();
@@ -59,6 +90,11 @@ export function ThreadCard({
   // Keep the hover controls visible while their portalled snooze menu is open.
   // Otherwise moving the pointer into the menu makes the trigger disappear.
   const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const pendingTitleNavigate = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingTitleNavigate.current !== null) clearTimeout(pendingTitleNavigate.current);
+  }, []);
   useEffect(() => {
     if (!canPark) setSnoozeMenuOpen(false);
   }, [canPark]);
@@ -67,16 +103,75 @@ export function ThreadCard({
   ) => {
     event.preventDefault();
     actions.open(thread.id, { split: event.metaKey || event.ctrlKey });
+    if (isWoken) onAcknowledgeWake?.();
     onNavigate();
+  };
+  const handleSplitPointerDown: PointerEventHandler<HTMLElement> = (event) => {
+    splitProps.onPointerDown?.(event);
+  };
+  const handleCardPointerDown: PointerEventHandler<HTMLElement> = (event) => {
+    handleSplitPointerDown(event);
+    reorder?.onPointerDown(event);
+  };
+  const handleCardClick = (event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (isRenaming) return;
+    if (reorder?.consumeSuppressedClick()) return;
+    if (onSelectionClick?.(event)) return;
+    openThread(event);
+  };
+  const handleRenameDoubleClick = () => {
+    if (pendingTitleNavigate.current !== null) {
+      clearTimeout(pendingTitleNavigate.current);
+      pendingTitleNavigate.current = null;
+    }
+    setIsRenaming(true);
+  };
+  const handleTitleClick = (event: MouseEvent<HTMLElement>) => {
+    // A browser emits click(detail=1), click(detail=2), then dblclick. Open on
+    // the first click only so a rename gesture never opens the thread twice.
+    if (event.detail > 1) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    if (isRenaming) return;
+    if (reorder?.consumeSuppressedClick()) return;
+    if (onSelectionClick?.(event)) return;
+    if (event.metaKey || event.ctrlKey || event.detail === 0) {
+      openThread(event);
+      return;
+    }
+    // Opening the thread is immediate. Only compact-layout drawer closure is
+    // deferred, so a second click can still reach the title and start rename.
+    actions.open(thread.id, { split: false });
+    if (isWoken) onAcknowledgeWake?.();
+    if (pendingTitleNavigate.current !== null) clearTimeout(pendingTitleNavigate.current);
+    pendingTitleNavigate.current = setTimeout(() => {
+      pendingTitleNavigate.current = null;
+      onNavigate();
+    }, 500);
   };
 
   return (
-    <li className="list-none">
-      <RowContextMenu thread={thread}>
+    <li
+      className={cn(
+        "list-none transition-opacity duration-150 ease-out motion-reduce:transition-none",
+        reorder?.isDragging && "opacity-50",
+      )}
+    >
+      <RowContextMenu
+        thread={thread}
+        onRename={() => setIsRenaming(true)}
+        onOpen={isWoken ? onAcknowledgeWake : undefined}
+      >
         <div
+          data-thread-card-root=""
+          data-thread-card-id={thread.id}
           className={cn(
             "group/card relative rounded-md px-2.5 py-2 transition-colors",
             isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
+            isSelected && "ring-1 ring-inset ring-ring bg-sidebar-accent/70",
             !isActive && layout !== null && "bg-sidebar-accent/30",
           )}
         >
@@ -84,23 +179,45 @@ export function ThreadCard({
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
             href="#"
-            aria-label={threadDisplayTitle(thread)}
+            aria-label={`${threadDisplayTitle(thread)}${isSelected ? ", selected" : ""}`}
             {...splitProps}
-            onClick={openThread}
-            className="absolute inset-0 cursor-pointer rounded-md"
+            draggable={false}
+            aria-keyshortcuts={
+              reorder
+                ? "Alt+ArrowUp Alt+ArrowDown Control+Space Meta+Space Shift+Space"
+                : "Control+Space Meta+Space Shift+Space"
+            }
+            onPointerDown={(event) => {
+              handleCardPointerDown(event);
+            }}
+            onKeyDown={(event) => {
+              if (onSelectionKeyDown?.(event)) return;
+              reorder?.onKeyDown(event);
+            }}
+            onClick={handleCardClick}
+            className={cn(
+              "absolute inset-0 rounded-md",
+              reorder && !reorder.disabled
+                ? "cursor-default active:cursor-grabbing"
+                : "cursor-default",
+            )}
           />
           <div
             data-thread-card-primary=""
             className="pointer-events-none relative flex h-5 items-center gap-1.5"
           >
-            <span
+            <InlineThreadTitle
+              thread={thread}
+              editing={isRenaming}
+              onEditingChange={setIsRenaming}
+              onPointerDown={handleCardPointerDown}
+              onClick={handleTitleClick}
+              onDoubleClick={handleRenameDoubleClick}
               className={cn(
                 "min-w-0 flex-1 truncate text-sm text-foreground",
                 thread.isUnread && "font-medium",
               )}
-            >
-              {threadDisplayTitle(thread)}
-            </span>
+            />
             {canPark ? (
               <span
                 className={cn(
@@ -116,7 +233,13 @@ export function ThreadCard({
                 <ParkButton label="Settle thread" icon="Check" onActivate={onSettle} />
               </span>
             ) : null}
-            <span
+            {isWoken ? (
+              <button type="button" aria-label="Dismiss Woken marker"
+                onClick={(event) => { event.preventDefault(); event.stopPropagation(); onAcknowledgeWake?.(); }}
+                className="pointer-events-auto relative z-10 shrink-0 rounded px-1 text-2xs font-medium text-foreground hover:bg-sidebar-accent">
+                Woken
+              </button>
+            ) : <span
               className={cn(
                 STATUS_SLOT_CLASS,
                 canPark && "group-hover/card:hidden",
@@ -124,7 +247,7 @@ export function ThreadCard({
               )}
             >
               <StatusOrTime thread={statusThread} now={now} />
-            </span>
+            </span>}
           </div>
           <div
             data-thread-card-metadata=""
@@ -133,9 +256,12 @@ export function ThreadCard({
             <MetadataIdentity
               projectName={projectName}
               branchName={thread.environment?.branchName ?? null}
-              hostName={thread.host?.name ?? null}
+              gitStatus={gitStatus}
+              pullRequestState={pullRequest?.state ?? null}
               onOpen={openThread}
-              onSplitPointerDown={splitProps.onPointerDown}
+              onSplitPointerDown={handleSplitPointerDown}
+              onReorderPointerDown={reorder?.onPointerDown}
+              consumeSuppressedClick={reorder?.consumeSuppressedClick}
             />
             {thread.activity.workflows > 0 ? (
               <ActivityCount label="workflows" count={thread.activity.workflows} />
@@ -149,9 +275,16 @@ export function ThreadCard({
             {pullRequest ? (
               <a
                 href={pullRequest.url}
+                draggable={false}
                 target="_blank"
                 rel="noreferrer"
-                onClick={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (reorder?.consumeSuppressedClick()) event.preventDefault();
+                }}
+                onPointerDown={(event) => {
+                  reorder?.onPointerDown(event);
+                }}
                 title={pullRequest.title}
                 className={cn(
                   "relative shrink-0 font-mono hover:underline",
@@ -170,7 +303,7 @@ export function ThreadCard({
             ) : null}
             <span
               data-thread-card-fixed-trailing=""
-              className="relative flex w-12 shrink-0 items-center justify-end gap-1"
+              className="relative flex min-w-12 shrink-0 items-center justify-end gap-1"
             >
               {childCount > 0 && onToggleChildren ? (
                 <button
@@ -183,7 +316,7 @@ export function ThreadCard({
                     event.stopPropagation();
                     onToggleChildren();
                   }}
-                  className="pointer-events-auto relative flex h-4 min-w-0 items-center gap-0.5 rounded px-0.5 tabular-nums text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                  className="pointer-events-auto relative flex h-4 shrink-0 items-center gap-0.5 rounded px-0.5 tabular-nums text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                 >
                   <Icon
                     name="ChevronDown"
@@ -192,7 +325,7 @@ export function ThreadCard({
                       !childrenExpanded && "-rotate-90",
                     )}
                   />
-                  <span className="truncate">{childCount}</span>
+                  <span className="whitespace-nowrap">{childCount}</span>
                 </button>
               ) : null}
               <ProviderGlyph providerId={thread.providerId} />
@@ -208,20 +341,33 @@ export function ThreadCard({
 function MetadataIdentity({
   projectName,
   branchName,
-  hostName,
+  gitStatus,
+  pullRequestState,
   onOpen,
   onSplitPointerDown,
+  onReorderPointerDown,
+  consumeSuppressedClick,
 }: {
   projectName: string | null;
   branchName: string | null;
-  hostName: string | null;
+  gitStatus?: GitStatusState | null;
+  pullRequestState?: "draft" | "open" | "merged" | "closed" | null;
   onOpen: (
     event: Pick<MouseEvent | KeyboardEvent, "preventDefault" | "metaKey" | "ctrlKey">,
   ) => void;
   onSplitPointerDown?: PointerEventHandler<HTMLElement>;
+  onReorderPointerDown?: PointerEventHandler<HTMLElement>;
+  consumeSuppressedClick?: () => boolean;
 }) {
-  const detail = branchName ?? hostName;
-  const fullLabel = [projectName, detail].filter(Boolean).join(" · ");
+  const detail = branchName;
+  const gitLabel = pullRequestState === "merged"
+    ? "Pull request merged"
+    : pullRequestState === "open" || pullRequestState === "draft"
+      ? "Pull request open"
+      : gitStatus
+        ? gitStatusLabel(gitStatus)
+        : null;
+  const fullLabel = [projectName, detail, gitLabel].filter(Boolean).join(" · ");
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationFrame = useRef<number | null>(null);
   const [isReturning, setIsReturning] = useState(false);
@@ -316,9 +462,18 @@ function MetadataIdentity({
       title={fullLabel || undefined}
       role="link"
       tabIndex={0}
-      className="group/metadata pointer-events-auto relative min-w-0 flex-1 cursor-pointer overflow-hidden whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
-      onClick={onOpen}
-      onPointerDown={onSplitPointerDown}
+      className="group/metadata pointer-events-auto relative min-w-0 flex-1 cursor-default overflow-hidden whitespace-nowrap outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
+      onClick={(event) => {
+        if (consumeSuppressedClick?.()) {
+          event.preventDefault();
+          return;
+        }
+        onOpen(event);
+      }}
+      onPointerDown={(event) => {
+        onSplitPointerDown?.(event);
+        onReorderPointerDown?.(event);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") onOpen(event);
       }}
@@ -334,7 +489,7 @@ function MetadataIdentity({
           isReturning && "opacity-0",
         )}
       >
-        <MetadataLabel projectName={projectName} detail={detail} />
+        <MetadataLabel projectName={projectName} detail={detail} gitStatus={gitStatus} pullRequestState={pullRequestState} />
       </span>
       <span
         aria-hidden
@@ -344,7 +499,7 @@ function MetadataIdentity({
           isReturning && "opacity-100",
         )}
       >
-        <MetadataLabel projectName={projectName} detail={detail} />
+        <MetadataLabel projectName={projectName} detail={detail} gitStatus={gitStatus} pullRequestState={pullRequestState} />
       </span>
     </span>
   );
@@ -353,9 +508,13 @@ function MetadataIdentity({
 function MetadataLabel({
   projectName,
   detail,
+  gitStatus,
+  pullRequestState,
 }: {
   projectName: string | null;
   detail: string | null;
+  gitStatus?: GitStatusState | null;
+  pullRequestState?: "draft" | "open" | "merged" | "closed" | null;
 }) {
   return (
     <>
@@ -363,6 +522,24 @@ function MetadataLabel({
       {projectName && detail ? (
         <span aria-hidden className="text-muted-foreground/50">
           {" · "}
+        </span>
+      ) : null}
+      {gitStatus ? (
+        <span title={pullRequestState === "merged" ? "Pull request merged" : pullRequestState === "open" || pullRequestState === "draft" ? "Pull request open" : gitStatusLabel(gitStatus)} className="mr-1 inline-flex align-middle">
+          <Icon
+            name="GitBranch"
+            aria-label={pullRequestState === "merged" ? "Pull request merged" : pullRequestState === "open" || pullRequestState === "draft" ? "Pull request open" : gitStatusLabel(gitStatus)}
+            className={cn(
+              "size-3",
+              pullRequestState === "open" && "text-success-foreground",
+              pullRequestState === "draft" && "text-muted-foreground/70",
+              pullRequestState === "merged" && "text-[color:var(--pr-merged)]",
+              (!pullRequestState || pullRequestState === "closed") && gitStatus === "clean" && "text-muted-foreground/70",
+              (!pullRequestState || pullRequestState === "closed") && (gitStatus === "untracked" || gitStatus === "dirty_uncommitted") && "text-warning",
+              (!pullRequestState || pullRequestState === "closed") && gitStatus === "committed_unmerged" && "text-primary",
+              (!pullRequestState || pullRequestState === "closed") && gitStatus === "dirty_and_committed_unmerged" && "text-attention",
+            )}
+          />
         </span>
       ) : null}
       {detail ? (
@@ -375,6 +552,16 @@ function MetadataLabel({
       ) : null}
     </>
   );
+}
+
+function gitStatusLabel(state: GitStatusState): string {
+  switch (state) {
+    case "clean": return "Git clean";
+    case "untracked": return "Git has untracked files";
+    case "dirty_uncommitted": return "Git has uncommitted changes";
+    case "committed_unmerged": return "Git has unmerged commits";
+    case "dirty_and_committed_unmerged": return "Git has changes and unmerged commits";
+  }
 }
 
 function SnoozeMenu({
@@ -413,12 +600,9 @@ function SnoozeMenu({
           align="end"
           sideOffset={4}
           aria-label="Snooze thread"
-          className="z-50 w-52 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none"
+          className="z-50 w-24 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none"
           onClick={(event) => event.stopPropagation()}
         >
-          <p className="px-2 pb-1 pt-1 text-2xs font-medium text-muted-foreground">
-            Snooze until
-          </p>
           {presets.map((preset) => (
             <button
               key={preset.id}
@@ -429,12 +613,9 @@ function SnoozeMenu({
                 onOpenChange(false);
                 onSnooze(preset.snoozedUntil);
               }}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground outline-none hover:bg-accent focus-visible:bg-accent"
+              className="flex w-full cursor-pointer items-center rounded-md px-1.5 py-1 text-left text-xs text-foreground outline-none hover:bg-accent focus-visible:bg-accent"
             >
               <span className="min-w-0 flex-1">{preset.label}</span>
-              <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground/70">
-                {snoozePresetWhenLabel(preset.id, preset.snoozedUntil)}
-              </span>
             </button>
           ))}
           <Popover.Arrow className="fill-border" />
@@ -442,20 +623,6 @@ function SnoozeMenu({
       </Popover.Portal>
     </Popover.Root>
   );
-}
-
-function snoozePresetWhenLabel(
-  id: ReturnType<typeof resolveSnoozePresets>[number]["id"],
-  snoozedUntil: number,
-): string {
-  const wake = new Date(snoozedUntil);
-  const time = wake.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  if (id !== "next-week") return time;
-  const weekday = wake.toLocaleDateString(undefined, { weekday: "short" });
-  return `${weekday} ${time}`;
 }
 
 function ParkButton({

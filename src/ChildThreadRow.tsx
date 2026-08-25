@@ -15,6 +15,7 @@ export function ChildThreadRow({
   onNavigate,
   now,
   childCount = 0,
+  onOpen,
 }: {
   thread: PluginSidebarThread;
   isActive: boolean;
@@ -22,6 +23,7 @@ export function ChildThreadRow({
   now: number;
   /** Deeper descendants stay in the header UI and are summarized here. */
   childCount?: number;
+  onOpen?: () => void;
 }) {
   const actions = useSidebarThreadActions();
   const { splitProps, layout } = useSidebarThreadSplit(thread.id);
@@ -29,7 +31,7 @@ export function ChildThreadRow({
 
   return (
     <li className="list-none">
-      <RowContextMenu thread={thread}>
+      <RowContextMenu thread={thread} onOpen={onOpen}>
         <div
           className={cn(
             "relative flex h-8 items-center gap-1.5 rounded-md px-2 text-xs transition-colors",
@@ -41,11 +43,15 @@ export function ChildThreadRow({
             href="#"
             aria-label={title}
             {...splitProps}
+            onPointerDown={(event) => {
+              splitProps.onPointerDown?.(event);
+            }}
             onClick={(event) => {
               event.preventDefault();
               actions.open(thread.id, {
                 split: event.metaKey || event.ctrlKey,
               });
+              onOpen?.();
               onNavigate();
             }}
             className="absolute inset-0 cursor-pointer rounded-md"

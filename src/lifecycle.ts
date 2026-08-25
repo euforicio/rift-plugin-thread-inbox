@@ -27,6 +27,20 @@ export interface ThreadActivitySignals {
 }
 
 export type ThreadShelf = "active" | "snoozed" | "settled";
+export type WakeReason = "timer" | "attention";
+
+export function resolveWakeReason(
+  row: ThreadLifecycleRow | undefined,
+  signals: ThreadActivitySignals,
+  now: number,
+): WakeReason | null {
+  if (row?.snoozedUntil === null || row?.snoozedUntil === undefined) return null;
+  const wokeOnAttention =
+    signals.hasPendingInteraction ||
+    (row.snoozedAt !== null && signals.latestAttentionAt > row.snoozedAt);
+  if (wokeOnAttention) return "attention";
+  return row.snoozedUntil <= now ? "timer" : null;
+}
 
 /**
  * Whether a thread may be parked at all.
@@ -58,10 +72,7 @@ export function resolveShelf(
   if (row.snoozedUntil !== null) {
     // A timer that has elapsed wakes the thread; so does anything that
     // happened after the snooze was set.
-    const wokeOnTimer = row.snoozedUntil <= now;
-    const wokeOnActivity =
-      row.snoozedAt !== null && signals.latestAttentionAt > row.snoozedAt;
-    if (!wokeOnTimer && !wokeOnActivity) return "snoozed";
+    if (resolveWakeReason(row, signals, now) === null) return "snoozed";
     return "active";
   }
 
@@ -85,7 +96,7 @@ const DAY_MS = 24 * HOUR_MS;
  */
 export function snoozeWakeLabel(snoozedUntil: number, now: number): string {
   const remaining = snoozedUntil - now;
-  if (remaining <= 0) return "now";
+  if (remaining <= 0) return "Woken";
   if (remaining < HOUR_MS) {
     return `${Math.max(1, Math.ceil(remaining / MINUTE_MS))}m`;
   }
@@ -93,7 +104,7 @@ export function snoozeWakeLabel(snoozedUntil: number, now: number): string {
   return `${Math.ceil(remaining / DAY_MS)}d`;
 }
 
-export type SnoozePresetId = "hour" | "evening" | "tomorrow" | "next-week";
+export type SnoozePresetId = "30m" | "2h" | "1d" | "1w";
 
 export interface SnoozePreset {
   id: SnoozePresetId;
@@ -101,50 +112,18 @@ export interface SnoozePreset {
   snoozedUntil: number;
 }
 
-const EVENING_HOUR = 18;
-const MORNING_HOUR = 9;
-
-/**
- * Calendar-day arithmetic, not fixed millisecond offsets: adding 24 hours
- * lands on the wrong local day across a daylight-saving change, because a
- * spring-forward day is 23 hours long.
- */
-function atHour(base: Date, hour: number, addDays = 0): Date {
-  const next = new Date(base);
-  next.setDate(next.getDate() + addDays);
-  next.setHours(hour, 0, 0, 0);
-  return next;
-}
-
-/** "This evening" only appears while it is meaningfully before evening. */
+/** The compact duration presets used by BB Sidebar. */
 export function resolveSnoozePresets(now: Date): SnoozePreset[] {
-  const presets: SnoozePreset[] = [
-    { id: "hour", label: "In 1 hour", snoozedUntil: now.getTime() + HOUR_MS },
+  return [
+    {
+      id: "30m",
+      label: "30 minutes",
+      snoozedUntil: now.getTime() + 30 * MINUTE_MS,
+    },
+    { id: "2h", label: "2 hours", snoozedUntil: now.getTime() + 2 * HOUR_MS },
+    { id: "1d", label: "1 day", snoozedUntil: now.getTime() + DAY_MS },
+    { id: "1w", label: "1 week", snoozedUntil: now.getTime() + 7 * DAY_MS },
   ];
-
-  const evening = atHour(now, EVENING_HOUR);
-  if (evening.getTime() - now.getTime() > HOUR_MS) {
-    presets.push({
-      id: "evening",
-      label: "This evening",
-      snoozedUntil: evening.getTime(),
-    });
-  }
-
-  presets.push({
-    id: "tomorrow",
-    label: "Tomorrow",
-    snoozedUntil: atHour(now, MORNING_HOUR, 1).getTime(),
-  });
-
-  const daysUntilMonday = (1 - now.getDay() + 7) % 7 || 7;
-  presets.push({
-    id: "next-week",
-    label: "Next week",
-    snoozedUntil: atHour(now, MORNING_HOUR, daysUntilMonday).getTime(),
-  });
-
-  return presets;
 }
 
 /**

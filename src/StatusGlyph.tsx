@@ -79,7 +79,7 @@ export function StatusGlyph({
         <Icon
           name="Loading"
           aria-label={aria}
-          className={cn(shared, "animate-spin text-muted-foreground/50")}
+          className={cn(shared, "animate-spin text-muted-foreground/70")}
         />
       );
     case "workflow":
