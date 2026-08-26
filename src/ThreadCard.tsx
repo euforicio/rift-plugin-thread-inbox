@@ -30,7 +30,7 @@ export interface ThreadReorderControls {
   disabled: boolean;
   isDragging: boolean;
   onPointerDown: PointerEventHandler<HTMLElement>;
-  onKeyDown: KeyboardEventHandler<HTMLAnchorElement>;
+  onKeyDown: KeyboardEventHandler<HTMLElement>;
   consumeSuppressedClick: () => boolean;
 }
 
@@ -152,6 +152,7 @@ export function ThreadCard({
   // Otherwise moving the pointer into the menu makes the trigger disappear.
   const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const rowLinkRef = useRef<HTMLAnchorElement | null>(null);
   const pendingTitleNavigate = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (pendingTitleNavigate.current !== null) clearTimeout(pendingTitleNavigate.current);
@@ -171,6 +172,11 @@ export function ThreadCard({
     splitProps.onPointerDown?.(event);
   };
   const handleCardPointerDown: PointerEventHandler<HTMLElement> = (event) => {
+    // The visible title sits above the full-card anchor. Explicitly focus that
+    // anchor so keyboard reordering works after selecting a row by its title.
+    if (event.button === 0 && event.currentTarget !== rowLinkRef.current) {
+      rowLinkRef.current?.focus({ preventScroll: true });
+    }
     handleSplitPointerDown(event);
     reorder?.onPointerDown(event);
   };
@@ -229,6 +235,7 @@ export function ThreadCard({
         <div
           data-thread-card-root=""
           data-thread-card-id={thread.id}
+          onKeyDownCapture={(event) => reorder?.onKeyDown(event)}
           className={cn(
             "group/card relative rounded-md px-2.5 py-2 transition-colors",
             isActive ? "bg-sidebar-accent" : "hover:bg-sidebar-accent/60",
@@ -237,6 +244,7 @@ export function ThreadCard({
           )}
         >
           <a
+            ref={rowLinkRef}
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
             href="#"
@@ -252,8 +260,7 @@ export function ThreadCard({
               handleCardPointerDown(event);
             }}
             onKeyDown={(event) => {
-              if (onSelectionKeyDown?.(event)) return;
-              reorder?.onKeyDown(event);
+              onSelectionKeyDown?.(event);
             }}
             onClick={handleCardClick}
             className={cn(
