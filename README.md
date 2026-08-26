@@ -3,7 +3,9 @@
 [![CI](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml/badge.svg)](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml)
 
 A compact inbox-style sidebar for BB with nested child threads, persistent
-ordering, parking controls, provider marks, and Git metadata.
+ordering, parking controls, provider marks, and Git metadata. Thread Inbox is
+a standalone evolution of [T3 Sidebar](https://github.com/SawyerHood/bb-plugin-t3sidebar)
+by [Sawyer Hood](https://github.com/SawyerHood).
 
 ## Features
 
@@ -16,13 +18,15 @@ ordering, parking controls, provider marks, and Git metadata.
 
 ## Install
 
+No semver release tag has been published yet. When `0.2.1` is released, install
+compatible stable releases rather than tracking `main`:
+
 ```sh
-bb plugin install git:https://github.com/wy3z/bb-plugin-t3sidebar.git@main
+bb plugin install git:https://github.com/wy3z/bb-plugin-t3sidebar.git@^0.2.1
 ```
 
-Select **Thread Inbox** under **Settings → Appearance → Sidebar**.
-
-Update later with:
+Select **Thread Inbox** under **Settings → Appearance → Sidebar**. Update a
+stable installation with:
 
 ```sh
 bb plugin update thread-inbox
