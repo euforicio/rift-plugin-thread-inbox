@@ -247,6 +247,7 @@ export function ThreadCard({
             ref={rowLinkRef}
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
+            data-thread-reorder-disabled={reorder?.disabled ? "" : undefined}
             href="#"
             aria-label={`${threadDisplayTitle(thread)}${isSelected ? ", selected" : ""}`}
             {...splitProps}

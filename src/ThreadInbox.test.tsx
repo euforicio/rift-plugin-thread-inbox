@@ -288,6 +288,62 @@ describe("ThreadInbox", () => {
     );
   });
 
+  it("reorders the active thread while focus is in the main view", async () => {
+    let revision = 0;
+    let storedOrder = ["first", "second"];
+    const rendered = renderSlot(
+      inbox,
+      { ...listProps, activeThreadId: "first" },
+      {
+        sidebarThreads: {
+          status: "ready",
+          threads: [
+            thread({ id: "first", title: "First", createdAt: 2 }),
+            thread({ id: "second", title: "Second", createdAt: 1 }),
+          ],
+          projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+        },
+        rpc: {
+          listLifecycle: () => ({ rows: [] }),
+          listThreadOrder: () => ({ threadIds: storedOrder, revision }),
+          reorderThreads: (input) => {
+            storedOrder = (input as { threadIds: string[] }).threadIds;
+            revision += 1;
+            return { threadIds: storedOrder, revision, applied: true };
+          },
+        },
+      },
+    );
+
+    await waitFor(() =>
+      expect(
+        rendered.inspection.rpcCalls.filter(
+          ({ method }) => method === "listThreadOrder",
+        ),
+      ).toHaveLength(2),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("link", { name: "First" }).hasAttribute(
+          "data-thread-reorder-disabled",
+        ),
+      ).toBe(false),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fireEvent.keyDown(document.body, { key: "ArrowDown", altKey: true });
+
+    await waitFor(() =>
+      expect(rendered.inspection.rpcCalls).toContainEqual({
+        method: "reorderThreads",
+        input: {
+          shelf: "inbox",
+          threadIds: ["second", "first"],
+          expectedRevision: 0,
+        },
+      }),
+    );
+  });
+
   it("reorders after the visible title receives focus", async () => {
     let revision = 0;
     let storedOrder = ["first", "second"];

@@ -210,6 +210,58 @@ export function ThreadInbox({
     orderThreads(inboxBase, inboxOrder.ids),
     dragOrder?.shelf === "inbox" ? dragOrder.ids : null,
   );
+  const reorderThreadByOffset = useCallback(
+    (threadId: string, shelf: ThreadOrderShelf, offset: -1 | 1) => {
+      const target = shelf === "pinned" ? pinnedOrder : inboxOrder;
+      if (target.isReordering) return false;
+      const visibleIds = (shelf === "pinned" ? pinned : inbox).map(
+        (thread) => thread.id,
+      );
+      const nextVisibleIds = moveThreadIdByOffset(
+        visibleIds,
+        threadId,
+        offset,
+      );
+      if (nextVisibleIds.join("\0") === visibleIds.join("\0")) return false;
+      void target.reorder(mergeVisibleOrder(target.ids, nextVisibleIds));
+      return true;
+    },
+    [inbox, inboxOrder, pinned, pinnedOrder],
+  );
+  useEffect(() => {
+    const onActiveThreadReorder = (event: globalThis.KeyboardEvent) => {
+      if (
+        !event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        (event.key !== "ArrowUp" && event.key !== "ArrowDown") ||
+        activeThreadId === null
+      ) return;
+      const activeRow = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-sidebar-thread-id]"),
+      ).find((row) => row.dataset.sidebarThreadId === activeThreadId);
+      if (activeRow?.hasAttribute("data-thread-reorder-disabled")) return;
+      const shelf = pinned.some((thread) => thread.id === activeThreadId)
+        ? "pinned"
+        : inbox.some((thread) => thread.id === activeThreadId)
+          ? "inbox"
+          : null;
+      if (!shelf) return;
+      event.preventDefault();
+      event.stopPropagation();
+      reorderThreadByOffset(
+        activeThreadId,
+        shelf,
+        event.key === "ArrowUp" ? -1 : 1,
+      );
+    };
+    // Capture before BB's app-level keyboard dispatcher and before the chat
+    // composer. The active thread is the reorder target, so this remains usable
+    // after opening the row and moving focus into the main thread view.
+    document.addEventListener("keydown", onActiveThreadReorder, true);
+    return () => document.removeEventListener("keydown", onActiveThreadReorder, true);
+  }, [activeThreadId, inbox, pinned, reorderThreadByOffset]);
   const inactiveForcedOpen =
     (searchQuery.trim().length > 0 && inactive.length > 0) ||
     (activeThreadId !== null &&
@@ -510,17 +562,21 @@ export function ThreadInbox({
       onKeyDown: (event) => {
         if (
           !event.altKey ||
-          target.isReordering ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
           (event.key !== "ArrowUp" && event.key !== "ArrowDown")
         ) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const ids = moveThreadIdByOffset(
-          visibleIds,
-          thread.id,
-          event.key === "ArrowUp" ? -1 : 1,
-        );
-        void target.reorder(mergeVisibleOrder(target.ids, ids));
+        if (
+          reorderThreadByOffset(
+            thread.id,
+            shelf,
+            event.key === "ArrowUp" ? -1 : 1,
+          )
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
       },
     };
   };
