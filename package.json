@@ -14,7 +14,7 @@
     "bbPluginSdk": ">=0.4.3"
   },
   "bb": {
-    "name": "Thread Inbox",
+    "name": "Thread Inbox (w/ Children)",
     "description": "Stable inbox ordering with collapsible nested child threads.",
     "branding": {
       "icon": "PanelLeft"
