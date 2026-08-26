@@ -85,7 +85,7 @@ function render(
 
 afterEach(cleanup);
 
-describe("t3sidebar registration", () => {
+describe("thread inbox registration", () => {
   it("registers exactly one thread list", () => {
     expect(app.threadLists).toHaveLength(1);
     expect(inbox.id).toBe("inbox");
@@ -656,6 +656,51 @@ describe("card metadata", () => {
     ).toBeTruthy();
   });
 
+  it("colors the no-PR branch glyph from the Git state", async () => {
+    const states = [
+      ["clean", "text-muted-foreground/70"],
+      ["untracked", "text-warning"],
+      ["dirty_uncommitted", "text-warning"],
+      ["committed_unmerged", "text-primary"],
+      ["dirty_and_committed_unmerged", "text-warning"],
+    ] as const;
+
+    for (const [state, colorClass] of states) {
+      const rendered = renderSlot(inbox, listProps, {
+        sidebarThreads: {
+          status: "ready",
+          threads: [
+            thread({
+              id: `thr_${state}`,
+              environment: {
+                id: "env_git",
+                name: null,
+                branchName: "main",
+                workspaceDisplayKind: "managed-worktree",
+              },
+            }),
+          ],
+          projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
+        },
+        rpc: {
+          listLifecycle: () => ({ rows: [] }),
+          listEnvironmentGitStates: () => ({
+            states: [{ environmentId: "env_git", state }],
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        const glyphs = document.querySelectorAll('[data-icon="GitBranch"]');
+        expect(glyphs.length).toBeGreaterThan(0);
+        glyphs.forEach((glyph) =>
+          expect(glyph.classList.contains(colorClass)).toBe(true),
+        );
+      });
+      rendered.unmount();
+    }
+  });
+
   it("forwards split dragging from metadata", () => {
     const rendered = render([
       thread({
@@ -684,21 +729,11 @@ describe("card metadata", () => {
         projects: [{ id: "proj_1", name: "bb", isPersonal: false }],
       },
       rpc: { listLifecycle: () => ({ rows: [] }) },
-      sidebarPullRequests: {
-        thr_controls: {
-          number: 412,
-          title: "Fix the flake",
-          url: "https://github.com/o/r/pull/412",
-          state: "open",
-          attention: "none",
-        } as never,
-      },
     });
     fireEvent.pointerDown(
       await screen.findByRole("button", { name: "Snooze thread" }),
     );
     fireEvent.pointerDown(screen.getByLabelText("Settle thread"));
-    fireEvent.pointerDown(screen.getByRole("link", { name: "#412" }));
     expect(rendered.sidebarActionCalls).not.toContainEqual({
       method: "open",
       threadId: "thr_controls",
@@ -862,8 +897,8 @@ describe("attention states", () => {
   });
 });
 
-describe("pull request badge", () => {
-  const withPr = (attention: string, state = "open") =>
+describe("pull request metadata", () => {
+  const withPr = (state = "open") =>
     renderSlot(inbox, listProps, {
       sidebarThreads: {
         status: "ready",
@@ -877,36 +912,42 @@ describe("pull request badge", () => {
           title: "Fix the flake",
           url: "https://github.com/o/r/pull/412",
           state,
-          attention,
+          attention: "none",
         } as never,
       },
     });
 
-  it("links the PR number out to the git host", async () => {
-    withPr("none");
-    const badge = await screen.findByRole("link", { name: "#412" });
-    expect(badge.getAttribute("href")).toBe("https://github.com/o/r/pull/412");
-    expect(badge.getAttribute("title")).toBe("Fix the flake");
+  it("matches BB's dynamic pull-request glyphs and colors", async () => {
+    const states = [
+      ["open", "GitPullRequestArrow", "text-success"],
+      ["draft", "GitPullRequestDraft", "text-muted-foreground"],
+      ["merged", "GitMerge", "text-pr-merged"],
+      ["closed", "GitPullRequestClosed", "text-destructive"],
+    ] as const;
+
+    for (const [state, icon, colorClass] of states) {
+      const rendered = withPr(state);
+      await waitFor(() => {
+        const glyphs = document.querySelectorAll(`[data-icon="${icon}"]`);
+        expect(glyphs.length).toBeGreaterThan(0);
+        glyphs.forEach((glyph) =>
+          expect(glyph.classList.contains(colorClass)).toBe(true),
+        );
+      });
+      rendered.unmount();
+    }
   });
 
-  it("shows no badge when the branch has no PR", async () => {
-    render([thread({ id: "thr_nopr" })]);
-    await screen.findByText("A thread");
-    expect(screen.queryByRole("link", { name: /^#/ })).toBeNull();
-  });
-
-  // The attention state is bb's rolled-up "does this need you" signal, so the
-  // badge can colour itself without reading checks/review/mergeability.
-  it("colors the badge from the attention state", async () => {
-    const failing = withPr("checks_failed");
-    expect(
-      (await screen.findByRole("link", { name: "#412" })).className,
-    ).toContain("destructive");
-    failing.unmount();
-
-    withPr("ready_to_merge");
-    expect(
-      (await screen.findByRole("link", { name: "#412" })).className,
-    ).toContain("success");
+  it("keeps the PR number inside the scrollable metadata", async () => {
+    withPr();
+    await waitFor(() => {
+      const numbers = document.querySelectorAll(
+        "[data-thread-card-pull-request]",
+      );
+      expect(numbers).toHaveLength(2);
+      numbers.forEach((number) => expect(number.textContent).toBe("#412"));
+      expect(numbers[0]?.closest("[data-thread-card-identity]")).not.toBeNull();
+    });
+    expect(screen.queryByRole("link", { name: "#412" })).toBeNull();
   });
 });

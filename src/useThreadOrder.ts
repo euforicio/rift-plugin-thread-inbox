@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type PluginSidebarThread, useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
-import type { t3sidebarRpcContract } from "./server";
+import type { threadInboxRpcContract } from "./server";
 import { orderThreads, type ThreadOrderShelf } from "./thread-order";
 
 export function useThreadOrder(
   shelf: ThreadOrderShelf,
   baseThreads: readonly PluginSidebarThread[],
 ) {
-  const rpc = useRpc<typeof t3sidebarRpcContract>();
+  const rpc = useRpc<typeof threadInboxRpcContract>();
   const realtimeState = useRealtimeConnectionState();
   const [storedIds, setStoredIds] = useState<readonly string[] | null>(null);
   const [optimisticIds, setOptimisticIds] = useState<readonly string[] | null>(null);

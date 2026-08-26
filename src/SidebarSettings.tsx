@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
-import type { t3sidebarRpcContract } from "./server";
+import type { threadInboxRpcContract } from "./server";
 
 export function SidebarSettings() {
-  const rpc = useRpc<typeof t3sidebarRpcContract>();
+  const rpc = useRpc<typeof threadInboxRpcContract>();
   const realtimeState = useRealtimeConnectionState();
   const [enabled, setEnabled] = useState(false);
   const [hours, setHours] = useState(6);

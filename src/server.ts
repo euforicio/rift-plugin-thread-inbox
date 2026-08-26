@@ -1,4 +1,4 @@
-// bb-plugin-t3sidebar-nested backend — the settled / snoozed store.
+// bb-plugin-thread-inbox backend — the settled / snoozed store.
 //
 // This state lives in the plugin's own SQLite database, never on bb's thread.
 // Putting it on the thread would mean a schema change, a wire change, and a
@@ -56,7 +56,7 @@ const gitStateSchema = z.enum([
 ]);
 type GitState = z.infer<typeof gitStateSchema>;
 
-export const t3sidebarRpcContract = defineRpcContract({
+export const threadInboxRpcContract = defineRpcContract({
   listLifecycle: {
     input: z.object({}),
     output: z.object({
@@ -233,7 +233,7 @@ export default function plugin(bb: BbPluginApi) {
     bb.realtime.publish(LIFECYCLE_CHANNEL, { threadId });
   };
 
-  bb.rpc.register(t3sidebarRpcContract, {
+  bb.rpc.register(threadInboxRpcContract, {
     async listLifecycle() {
       return { rows: readAll() };
     },

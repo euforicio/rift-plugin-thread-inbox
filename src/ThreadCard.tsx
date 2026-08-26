@@ -41,6 +41,67 @@ export type GitStatusState =
   | "committed_unmerged"
   | "dirty_and_committed_unmerged";
 
+type PullRequestState = "draft" | "open" | "merged" | "closed";
+
+interface GitGlyphPresentation {
+  icon: IconName;
+  label: string;
+  colorClass: string;
+  sizeClass: string;
+}
+
+const NON_PR_GIT_COLORS: Record<GitStatusState, string> = {
+  clean: "text-muted-foreground/70",
+  untracked: "text-warning",
+  dirty_uncommitted: "text-warning",
+  committed_unmerged: "text-primary",
+  dirty_and_committed_unmerged: "text-warning",
+};
+
+const PULL_REQUEST_GIT_GLYPHS: Record<
+  PullRequestState,
+  GitGlyphPresentation
+> = {
+  open: {
+    icon: "GitPullRequestArrow",
+    label: "Open Pull Request",
+    colorClass: "text-success",
+    sizeClass: "size-4 shrink-0",
+  },
+  closed: {
+    icon: "GitPullRequestClosed",
+    label: "Closed Pull Request",
+    colorClass: "text-destructive",
+    sizeClass: "size-4 shrink-0",
+  },
+  merged: {
+    icon: "GitMerge",
+    label: "Merged Pull Request",
+    colorClass: "text-pr-merged",
+    sizeClass: "size-4 shrink-0",
+  },
+  draft: {
+    icon: "GitPullRequestDraft",
+    label: "Draft Pull Request",
+    colorClass: "text-muted-foreground",
+    sizeClass: "size-4 shrink-0",
+  },
+};
+
+function resolveGitGlyph(
+  pullRequestState: PullRequestState | null | undefined,
+  gitStatus: GitStatusState | null | undefined,
+): GitGlyphPresentation | null {
+  if (pullRequestState) return PULL_REQUEST_GIT_GLYPHS[pullRequestState];
+  if (!gitStatus) return null;
+  return {
+    icon: "GitBranch",
+    label: gitStatusLabel(gitStatus),
+    colorClass: NON_PR_GIT_COLORS[gitStatus],
+    sizeClass: "size-3 shrink-0",
+  };
+}
+
 export function ThreadCard({
   thread,
   statusThread = thread,
@@ -258,6 +319,7 @@ export function ThreadCard({
               branchName={thread.environment?.branchName ?? null}
               gitStatus={gitStatus}
               pullRequestState={pullRequest?.state ?? null}
+              pullRequestNumber={pullRequest?.number ?? null}
               onOpen={openThread}
               onSplitPointerDown={handleSplitPointerDown}
               onReorderPointerDown={reorder?.onPointerDown}
@@ -271,35 +333,6 @@ export function ThreadCard({
                 label="background agents"
                 count={thread.activity.backgroundAgents}
               />
-            ) : null}
-            {pullRequest ? (
-              <a
-                href={pullRequest.url}
-                draggable={false}
-                target="_blank"
-                rel="noreferrer"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (reorder?.consumeSuppressedClick()) event.preventDefault();
-                }}
-                onPointerDown={(event) => {
-                  reorder?.onPointerDown(event);
-                }}
-                title={pullRequest.title}
-                className={cn(
-                  "relative shrink-0 font-mono hover:underline",
-                  pullRequest.state === "merged"
-                    ? "text-[color:var(--pr-merged)]"
-                    : pullRequest.attention === "checks_failed" ||
-                        pullRequest.attention === "conflicts"
-                      ? "text-destructive-text"
-                      : pullRequest.attention === "ready_to_merge"
-                        ? "text-success-foreground"
-                        : "text-muted-foreground",
-                )}
-              >
-                #{pullRequest.number}
-              </a>
             ) : null}
             <span
               data-thread-card-fixed-trailing=""
@@ -343,6 +376,7 @@ function MetadataIdentity({
   branchName,
   gitStatus,
   pullRequestState,
+  pullRequestNumber,
   onOpen,
   onSplitPointerDown,
   onReorderPointerDown,
@@ -351,7 +385,8 @@ function MetadataIdentity({
   projectName: string | null;
   branchName: string | null;
   gitStatus?: GitStatusState | null;
-  pullRequestState?: "draft" | "open" | "merged" | "closed" | null;
+  pullRequestState?: PullRequestState | null;
+  pullRequestNumber?: number | null;
   onOpen: (
     event: Pick<MouseEvent | KeyboardEvent, "preventDefault" | "metaKey" | "ctrlKey">,
   ) => void;
@@ -360,14 +395,15 @@ function MetadataIdentity({
   consumeSuppressedClick?: () => boolean;
 }) {
   const detail = branchName;
-  const gitLabel = pullRequestState === "merged"
-    ? "Pull request merged"
-    : pullRequestState === "open" || pullRequestState === "draft"
-      ? "Pull request open"
-      : gitStatus
-        ? gitStatusLabel(gitStatus)
-        : null;
-  const fullLabel = [projectName, detail, gitLabel].filter(Boolean).join(" · ");
+  const gitLabel = resolveGitGlyph(pullRequestState, gitStatus)?.label ?? null;
+  const fullLabel = [
+    projectName,
+    detail,
+    gitLabel,
+    pullRequestNumber !== null && pullRequestNumber !== undefined
+      ? `PR #${pullRequestNumber}`
+      : null,
+  ].filter(Boolean).join(" · ");
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animationFrame = useRef<number | null>(null);
   const [isReturning, setIsReturning] = useState(false);
@@ -489,7 +525,7 @@ function MetadataIdentity({
           isReturning && "opacity-0",
         )}
       >
-        <MetadataLabel projectName={projectName} detail={detail} gitStatus={gitStatus} pullRequestState={pullRequestState} />
+        <MetadataLabel projectName={projectName} detail={detail} gitStatus={gitStatus} pullRequestState={pullRequestState} pullRequestNumber={pullRequestNumber} />
       </span>
       <span
         aria-hidden
@@ -499,7 +535,7 @@ function MetadataIdentity({
           isReturning && "opacity-100",
         )}
       >
-        <MetadataLabel projectName={projectName} detail={detail} gitStatus={gitStatus} pullRequestState={pullRequestState} />
+        <MetadataLabel projectName={projectName} detail={detail} gitStatus={gitStatus} pullRequestState={pullRequestState} pullRequestNumber={pullRequestNumber} />
       </span>
     </span>
   );
@@ -510,12 +546,15 @@ function MetadataLabel({
   detail,
   gitStatus,
   pullRequestState,
+  pullRequestNumber,
 }: {
   projectName: string | null;
   detail: string | null;
   gitStatus?: GitStatusState | null;
-  pullRequestState?: "draft" | "open" | "merged" | "closed" | null;
+  pullRequestState?: PullRequestState | null;
+  pullRequestNumber?: number | null;
 }) {
+  const gitGlyph = resolveGitGlyph(pullRequestState, gitStatus);
   return (
     <>
       {projectName ? <span data-thread-card-project="">{projectName}</span> : null}
@@ -524,21 +563,12 @@ function MetadataLabel({
           {" · "}
         </span>
       ) : null}
-      {gitStatus ? (
-        <span title={pullRequestState === "merged" ? "Pull request merged" : pullRequestState === "open" || pullRequestState === "draft" ? "Pull request open" : gitStatusLabel(gitStatus)} className="mr-1 inline-flex align-middle">
+      {gitGlyph ? (
+        <span title={gitGlyph.label} className="mr-1 inline-flex align-middle">
           <Icon
-            name="GitBranch"
-            aria-label={pullRequestState === "merged" ? "Pull request merged" : pullRequestState === "open" || pullRequestState === "draft" ? "Pull request open" : gitStatusLabel(gitStatus)}
-            className={cn(
-              "size-3",
-              pullRequestState === "open" && "text-success-foreground",
-              pullRequestState === "draft" && "text-muted-foreground/70",
-              pullRequestState === "merged" && "text-[color:var(--pr-merged)]",
-              (!pullRequestState || pullRequestState === "closed") && gitStatus === "clean" && "text-muted-foreground/70",
-              (!pullRequestState || pullRequestState === "closed") && (gitStatus === "untracked" || gitStatus === "dirty_uncommitted") && "text-warning",
-              (!pullRequestState || pullRequestState === "closed") && gitStatus === "committed_unmerged" && "text-primary",
-              (!pullRequestState || pullRequestState === "closed") && gitStatus === "dirty_and_committed_unmerged" && "text-attention",
-            )}
+            name={gitGlyph.icon}
+            aria-label={gitGlyph.label}
+            className={cn(gitGlyph.sizeClass, gitGlyph.colorClass)}
           />
         </span>
       ) : null}
@@ -549,6 +579,21 @@ function MetadataLabel({
         >
           {detail}
         </span>
+      ) : null}
+      {pullRequestNumber !== null && pullRequestNumber !== undefined ? (
+        <>
+          {projectName || detail ? (
+            <span aria-hidden className="text-muted-foreground/50">
+              {" · "}
+            </span>
+          ) : null}
+          <span
+            data-thread-card-pull-request=""
+            className="font-mono text-muted-foreground"
+          >
+            #{pullRequestNumber}
+          </span>
+        </>
       ) : null}
     </>
   );

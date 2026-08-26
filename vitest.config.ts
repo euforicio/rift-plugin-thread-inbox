@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     silent: "passed-only",
-    name: "bb-plugin-t3sidebar-nested",
+    name: "bb-plugin-thread-inbox",
     include: ["**/*.test.{ts,tsx}"],
     exclude: ["node_modules/**"],
   },

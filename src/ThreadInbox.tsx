@@ -45,7 +45,7 @@ import {
   visibleInboxThreads,
 } from "./inbox";
 import { isInactiveThread } from "./inactive";
-import type { t3sidebarRpcContract } from "./server";
+import type { threadInboxRpcContract } from "./server";
 import { EMPTY_THREAD_SELECTION, updateThreadSelection } from "./selection";
 
 const ALL_PROJECTS = "__all__";
@@ -79,7 +79,7 @@ export function ThreadInbox({
 }: PluginThreadListProps) {
   const { status, threads, projects } = useSidebarThreads();
   const actions = useSidebarThreadActions();
-  const rpc = useRpc<typeof t3sidebarRpcContract>();
+  const rpc = useRpc<typeof threadInboxRpcContract>();
   const realtimeState = useRealtimeConnectionState();
   const [inactiveAfterHours, setInactiveAfterHours] = useState<number | null>(null);
   const settingsRequestSeq = useRef(0);
@@ -386,7 +386,7 @@ export function ThreadInbox({
         const previousElementCursor = pressedElement.style.cursor;
         pressedElement.style.cursor = "grabbing";
         const dragCursorStyle = document.createElement("style");
-        dragCursorStyle.dataset.t3SidebarDragCursor = "";
+        dragCursorStyle.dataset.threadInboxDragCursor = "";
         dragCursorStyle.textContent = "* { cursor: grabbing !important; }";
         document.head.appendChild(dragCursorStyle);
         const pointerId = event.pointerId;

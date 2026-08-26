@@ -1,11 +1,11 @@
-# T3 Sidebar - Nested Child Threads fork
+# Thread Inbox
 
 [![CI](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml/badge.svg)](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml)
 
-A compact inbox-style sidebar for BB, forked from
-[Sawyer Hood's T3 Sidebar](https://github.com/SawyerHood/bb-plugin-t3sidebar).
+A compact inbox-style sidebar for BB with nested child threads, persistent
+ordering, parking controls, provider marks, and Git metadata.
 
-## Changes in this fork
+## Features
 
 - Child threads nest beneath collapsible parent cards.
 - Child status and activity bubble up to the parent.
@@ -20,12 +20,12 @@ A compact inbox-style sidebar for BB, forked from
 bb plugin install git:https://github.com/wy3z/bb-plugin-t3sidebar.git@main
 ```
 
-Select **T3 Sidebar (Nested)** under **Settings → Appearance → Sidebar**.
+Select **Thread Inbox** under **Settings → Appearance → Sidebar**.
 
 Update later with:
 
 ```sh
-bb plugin update t3sidebar-nested
+bb plugin update thread-inbox
 ```
 
 ## Behavior
