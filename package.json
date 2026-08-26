@@ -6,9 +6,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wy3z/bb-plugin-t3sidebar.git"
+    "url": "git+https://github.com/wy3z/bb-plugin-thread-inbox.git"
   },
-  "homepage": "https://github.com/wy3z/bb-plugin-t3sidebar#readme",
+  "homepage": "https://github.com/wy3z/bb-plugin-thread-inbox#readme",
   "engines": {
     "bb": ">=0.37.0",
     "bbPluginSdk": ">=0.4.3"

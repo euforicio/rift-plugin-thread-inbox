@@ -1,6 +1,6 @@
 # Thread Inbox (w/ Children)
 
-[![CI](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml/badge.svg)](https://github.com/wy3z/bb-plugin-t3sidebar/actions/workflows/ci.yml)
+[![CI](https://github.com/wy3z/bb-plugin-thread-inbox/actions/workflows/ci.yml/badge.svg)](https://github.com/wy3z/bb-plugin-thread-inbox/actions/workflows/ci.yml)
 
 A compact inbox-style sidebar for BB with nested child threads, persistent
 ordering, parking controls, provider marks, and Git metadata. It is a standalone
@@ -28,7 +28,7 @@ by [Sawyer Hood](https://github.com/SawyerHood).
 ## Install
 
 ```sh
-bb plugin install git:https://github.com/wy3z/bb-plugin-t3sidebar.git@^0.2.1
+bb plugin install git:https://github.com/wy3z/bb-plugin-thread-inbox.git@^0.2.1
 ```
 
 Select **Thread Inbox (w/ Children)** under **Settings → Appearance → Sidebar**. Update a
