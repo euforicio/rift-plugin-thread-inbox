@@ -133,6 +133,22 @@ describe("settle active thread shortcut", () => {
     press();
     expect(rendered.inspection.rpcCalls.some((call) => call.method === "settle")).toBe(false);
   });
+  it("settles from the chat composer without submitting or clearing its draft", () => {
+    const rendered = setup([thread({ id: "active" })]);
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-promptbox-editor-content", "");
+    wrapper.innerHTML = '<div class="ProseMirror" contenteditable="true" tabindex="0">Unsent draft</div>';
+    document.body.append(wrapper);
+    try {
+      const editor = wrapper.firstElementChild as HTMLElement;
+      editor.focus();
+      expect(fireEvent.keyDown(editor, { key: "s", ctrlKey: true, altKey: true })).toBe(false);
+      expect(rendered.inspection.rpcCalls.filter((call) => call.method === "settle")).toEqual([{ method: "settle", input: { threadId: "active" } }]);
+      expect(editor.textContent).toBe("Unsent draft");
+    } finally {
+      wrapper.remove();
+    }
+  });
   it("targets an active child exactly, without settling its parent", () => {
     const rendered = setup([thread({ id: "parent" }), thread({ id: "active", parentThreadId: "parent" })]);
     press();

@@ -47,6 +47,25 @@ describe("settle shortcut guards", () => {
     expect(matches(document.querySelector("span") ?? document.body.firstElementChild!)).toBe(false);
   });
 
+  it("allows BB's composer and its nested text without changing the draft", () => {
+    document.body.innerHTML = '<div data-promptbox-editor-content><div class="ProseMirror" contenteditable="true" role="textbox" tabindex="0"><p>Keep this draft</p></div></div>';
+    const editor = document.querySelector<HTMLElement>(".ProseMirror")!;
+    editor.focus();
+    expect(matches(editor)).toBe(true);
+    expect(matches(editor.querySelector("p")!)).toBe(true);
+    expect(editor.textContent).toBe("Keep this draft");
+    expect(matches(editor, { isComposing: true })).toBe(false);
+    expect(matches(editor, { modifierAltGraph: true })).toBe(false);
+    document.body.firstElementChild!.setAttribute("role", "dialog");
+    expect(matches(editor)).toBe(false);
+  });
+
+  it("does not exempt arbitrary editors or inputs inside the composer wrapper", () => {
+    document.body.innerHTML = '<div data-promptbox-editor-content><div contenteditable="true"></div><input></div>';
+    expect(matches(document.querySelector("[contenteditable]")!)).toBe(false);
+    expect(matches(document.querySelector("input")!)).toBe(false);
+  });
+
   it("guards focus even when the event target is document/body", () => {
     const input = document.createElement("input");
     document.body.append(input);

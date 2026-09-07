@@ -63,11 +63,14 @@ interactions, workflows, background agents/commands, plan mode, and goals block
 the action, including activity in descendants. Already snoozed/settled threads
 are left alone. Unread finished output alone does not block settling.
 
-The shortcut ignores inputs, textareas, selects, contenteditable/composer fields,
-editor/terminal surfaces, menus and modal dialogs, as well as handled events,
-IME composition, AltGraph, and held-key repeats. Move focus outside the editor
-before using it. Duplicate requests are suppressed while a settle is pending;
-failures show a toast and permit retry.
+The shortcut works while typing in BB's chat composer without submitting or
+clearing the draft. This narrow exception recognizes BB's
+`[data-promptbox-editor-content] .ProseMirror[contenteditable="true"]` surface;
+if BB changes that markup, it safely falls back to ignoring the editor.
+Other inputs, textareas, selects, contenteditable fields, file editors, terminals,
+menus and modal dialogs remain protected, as do handled events, IME composition,
+AltGraph, and held-key repeats. Duplicate requests are suppressed while a settle
+is pending; failures show a toast and permit retry.
 
 SDK 0.4.21 has no public shortcut contribution API, so this uses a cleaned-up,
 bubbling document listener rather than BB-private APIs. The binding is absent
