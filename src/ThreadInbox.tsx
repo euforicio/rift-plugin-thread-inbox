@@ -10,6 +10,8 @@ import {
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "./components/Icon";
+import { toast } from "sonner";
+import { matchesSettleShortcut } from "./settle-shortcut";
 import { cn } from "./lib/utils";
 import {
   Select,
@@ -96,6 +98,25 @@ export function ThreadInbox({
   useEffect(() => { void loadSettings(); }, [loadSettings, realtimeState]);
   useRealtime("sidebar-settings", () => { void loadSettings(); });
   const lifecycle = useLifecycle(threads);
+  const settlingRef = useRef(false);
+  useEffect(() => {
+    const onSettle = (event: globalThis.KeyboardEvent) => {
+      if (status !== "ready" || settlingRef.current || !matchesSettleShortcut(event)) return;
+      const visible = visibleInboxThreads(threads);
+      const thread = visible.find((candidate) => candidate.id === activeThreadId);
+      if (!thread) return;
+      const descendants = descendantsOf(visible, thread.id);
+      if (!lifecycle.canPark(thread, descendants) || lifecycle.shelfFor(thread, descendants) !== "active") return;
+      event.preventDefault();
+      event.stopPropagation();
+      settlingRef.current = true;
+      void lifecycle.settle(thread.id)
+        .catch(() => { toast.error("Could not settle thread. Please try again."); })
+        .finally(() => { settlingRef.current = false; });
+    };
+    document.addEventListener("keydown", onSettle);
+    return () => document.removeEventListener("keydown", onSettle);
+  }, [activeThreadId, lifecycle, status, threads]);
   const [scope, setScope] = useState<string>(ALL_PROJECTS);
   // One clock for every card in a render, quantized to the minute so the
   // labels do not disagree and do not churn on unrelated re-renders.

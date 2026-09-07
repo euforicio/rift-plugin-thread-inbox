@@ -49,4 +49,34 @@ bb plugin update thread-inbox
 - Snoozed, settled, and inactive groups remain in compact collapsed shelves
   until opened.
 
+## Settle keyboard shortcut
+
+Press **Ctrl+Alt+S** (Mac: **Control+Option+S**, not Command) to
+settle the currently active/open thread. This targets that exact thread, not a
+hovered row, selected batch, or a child's parent, and works independently of
+project/search filtering while this sidebar is mounted. The active card's Settle
+button exposes the binding in its tooltip and `aria-keyshortcuts`.
+
+Only an unarchived thread on the active lifecycle shelf can be settled (including
+a quiet thread in the Inactive group). Running/working-draft threads, pending
+interactions, workflows, background agents/commands, plan mode, and goals block
+the action, including activity in descendants. Already snoozed/settled threads
+are left alone. Unread finished output alone does not block settling.
+
+The shortcut ignores inputs, textareas, selects, contenteditable/composer fields,
+editor/terminal surfaces, menus and modal dialogs, as well as handled events,
+IME composition, AltGraph, and held-key repeats. Move focus outside the editor
+before using it. Duplicate requests are suppressed while a settle is pending;
+failures show a toast and permit retry.
+
+SDK 0.4.21 has no public shortcut contribution API, so this uses a cleaned-up,
+bubbling document listener rather than BB-private APIs. The binding is absent
+from BB core's current default registry (including web/desktop and Mac variants),
+does not overlap this plugin's Alt+Up/Down or selection shortcuts, and avoids
+common browser and text-editing chords. It is not configurable in BB's keyboard
+settings. Custom BB bindings, browser extensions, OS shortcuts, or future defaults
+may conflict; avoid assigning this combination elsewhere. Eligibility uses the
+latest sidebar snapshot, not an atomic server-side activity check; subsequent
+live work/attention brings parked threads back through the existing lifecycle.
+
 MIT licensed; see [LICENSE](LICENSE).

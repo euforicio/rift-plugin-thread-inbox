@@ -92,6 +92,78 @@ describe("thread inbox registration", () => {
   });
 });
 
+describe("settle active thread shortcut", () => {
+  const press = () => fireEvent.keyDown(document.body, { key: "s", ctrlKey: true, altKey: true });
+  function setup(threads: PluginSidebarThread[], activeThreadId: string | null = "active", settle: () => Promise<{ ok: boolean }> = async () => ({ ok: true }), rows: { threadId: string; settledAt: number | null; snoozedAt: number | null; snoozedUntil: number | null }[] = []) {
+    return renderSlot(inbox, { ...listProps, activeThreadId }, {
+      sidebarThreads: { status: "ready", threads, projects: [] },
+      rpc: { listLifecycle: () => ({ rows }), settle },
+    });
+  }
+  it("settles only the active thread and exposes metadata only on its action", async () => {
+    const rendered = setup([thread({ id: "other" }), thread({ id: "active" })]);
+    const buttons = screen.getAllByRole("button", { name: "Settle thread" });
+    expect(buttons.filter((button) => button.getAttribute("aria-keyshortcuts") === "Control+Alt+S")).toHaveLength(1);
+    expect(buttons.find((button) => button.hasAttribute("aria-keyshortcuts"))?.title).toBe("Settle thread (Ctrl+Alt+S)");
+    press();
+    await waitFor(() => expect(rendered.inspection.rpcCalls.filter((call) => call.method === "settle")).toEqual([{ method: "settle", input: { threadId: "active" } }]));
+  });
+  it.each([
+    { indicator: "runtime" as const }, { indicator: "working-draft" as const },
+    { hasPendingInteraction: true }, { isArchived: true },
+    ...["workflows", "backgroundAgents", "backgroundCommands", "planMode", "goals"].map((key) => ({ activity: { ...thread().activity, [key]: 1 } })),
+  ])("does not settle blocked active threads: %j", async (overrides) => {
+    const rendered = setup([thread({ id: "active", ...overrides })]);
+    press();
+    expect(rendered.inspection.rpcCalls.some((call) => call.method === "settle")).toBe(false);
+  });
+  it("checks hidden descendants, not just the active parent", () => {
+    const rendered = setup([thread({ id: "active" }), thread({ id: "child", parentThreadId: "active", hasPendingInteraction: true })]);
+    press();
+    expect(rendered.inspection.rpcCalls.some((call) => call.method === "settle")).toBe(false);
+  });
+  it.each([null, "missing"])("ignores an absent active thread: %s", (id) => {
+    const rendered = setup([thread()], id);
+    press();
+    expect(rendered.inspection.rpcCalls.some((call) => call.method === "settle")).toBe(false);
+  });
+  it.each(["settled", "snoozed"])("leaves the %s shelf alone", async (shelf) => {
+    const rendered = setup([thread({ id: "active" })], "active", undefined, [{ threadId: "active", settledAt: shelf === "settled" ? 200 : null, snoozedAt: shelf === "snoozed" ? 200 : null, snoozedUntil: shelf === "snoozed" ? Date.now() + 60_000 : null }]);
+    await screen.findByRole("button", { name: new RegExp(shelf === "settled" ? "Settled" : "Snoozed") });
+    press();
+    expect(rendered.inspection.rpcCalls.some((call) => call.method === "settle")).toBe(false);
+  });
+  it("targets an active child exactly, without settling its parent", () => {
+    const rendered = setup([thread({ id: "parent" }), thread({ id: "active", parentThreadId: "parent" })]);
+    press();
+    expect(rendered.inspection.rpcCalls.filter((call) => call.method === "settle")).toEqual([{ method: "settle", input: { threadId: "active" } }]);
+  });
+  it("permits retry after an RPC failure", async () => {
+    let calls = 0;
+    const rendered = setup([thread({ id: "active" })], "active", async () => {
+      calls++;
+      if (calls === 1) throw new Error("offline");
+      return { ok: true };
+    });
+    press();
+    await waitFor(() => {
+      press();
+      expect(rendered.inspection.rpcCalls.filter((call) => call.method === "settle")).toHaveLength(2);
+    });
+  });
+  it("suppresses duplicate requests while pending and removes the listener on unmount", async () => {
+    let finish!: (value: { ok: boolean }) => void;
+    const rendered = setup([thread({ id: "active" })], "active", () => new Promise((resolve) => { finish = resolve; }));
+    press();
+    press();
+    expect(rendered.inspection.rpcCalls.filter((call) => call.method === "settle")).toHaveLength(1);
+    finish({ ok: true });
+    rendered.lifecycle.unmount();
+    press();
+    expect(rendered.inspection.rpcCalls.filter((call) => call.method === "settle")).toHaveLength(1);
+  });
+});
+
 describe("ThreadInbox", () => {
   it("keeps an old parent active while a child is working", async () => {
     renderSlot(inbox, listProps, {

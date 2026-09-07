@@ -25,6 +25,7 @@ import { STATUS_SLOT_CLASS, StatusOrTime } from "./StatusSlot";
 import { threadDisplayTitle } from "./inbox";
 import { resolveSnoozePresets } from "./lifecycle";
 import { InlineThreadTitle } from "./InlineThreadTitle";
+import { SETTLE_SHORTCUT, SETTLE_SHORTCUT_LABEL } from "./settle-shortcut";
 
 export interface ThreadReorderControls {
   disabled: boolean;
@@ -299,7 +300,7 @@ export function ThreadCard({
                   onOpenChange={setSnoozeMenuOpen}
                   onSnooze={onSnooze}
                 />
-                <ParkButton label="Settle thread" icon="Check" onActivate={onSettle} />
+                <ParkButton label="Settle thread" icon="Check" onActivate={onSettle} shortcut={isActive} />
               </span>
             ) : null}
             {isWoken ? (
@@ -682,15 +683,19 @@ function ParkButton({
   label,
   icon,
   onActivate,
+  shortcut = false,
 }: {
   label: string;
   icon: Extract<IconName, "Clock" | "Check">;
   onActivate: () => void;
+  shortcut?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-keyshortcuts={shortcut ? SETTLE_SHORTCUT : undefined}
+      title={shortcut ? `${label} (${SETTLE_SHORTCUT_LABEL})` : label}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
