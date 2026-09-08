@@ -5,10 +5,20 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["app.tsx", "src/**/*.ts", "src/**/*.tsx", "vitest.config.ts"]
+  "include": [
+    "app.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vitest.config.ts"
+  ]
 }

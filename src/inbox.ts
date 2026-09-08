@@ -1,7 +1,7 @@
 import type {
   PluginSidebarThread,
   PluginSidebarThreadIndicator,
-} from "@get-bb/plugin-sdk";
+} from "@riftlabs/plugin-sdk";
 
 /**
  * The sort that defines this sidebar: newest thread on top, and NOTHING moves

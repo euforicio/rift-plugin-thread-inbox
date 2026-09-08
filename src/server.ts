@@ -4,7 +4,7 @@
 // Putting it on the thread would mean a schema change, a wire change, and a
 // HOST_DAEMON_PROTOCOL_VERSION bump for something only this sidebar
 // understands. Here, uninstalling the plugin removes its state with it.
-import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
+import { defineRpcContract, type RiftPluginApi } from "@riftlabs/plugin-sdk";
 import { z } from "zod";
 
 const migrations = [
@@ -116,7 +116,7 @@ export const threadInboxRpcContract = defineRpcContract({
 /** Channel the frontend re-reads on. */
 export const LIFECYCLE_CHANNEL = "lifecycle";
 
-export default function plugin(bb: BbPluginApi) {
+export default function plugin(bb: RiftPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, migrations);
   const readSettings = () => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRealtimeConnectionState, useRpc } from "@riftlabs/plugin-sdk/app";
 import type { threadInboxRpcContract } from "./server";
 
 export function SidebarSettings() {

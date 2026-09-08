@@ -2,7 +2,7 @@ import {
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   type PluginSidebarThread,
-} from "@get-bb/plugin-sdk/app";
+} from "@riftlabs/plugin-sdk/app";
 import { cn } from "./lib/utils";
 import { RowContextMenu } from "./RowContextMenu";
 import { STATUS_SLOT_CLASS, StatusOrTime } from "./StatusSlot";

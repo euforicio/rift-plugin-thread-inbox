@@ -3,7 +3,7 @@ import {
   createFakePluginHost,
   makeThreadResponse,
   type FakePluginHost,
-} from "@get-bb/plugin-sdk/testing";
+} from "@riftlabs/plugin-sdk/testing";
 import plugin, { LIFECYCLE_CHANNEL } from "./server";
 
 type LifecycleRow = {
@@ -27,7 +27,7 @@ const startPlugin = async (): Promise<FakePluginHost> => {
     pluginId: "thread-inbox-test",
     sdk: { subscribe: () => () => {} },
   });
-  await plugin(host.bb);
+  await plugin(host.rift);
   return host;
 };
 

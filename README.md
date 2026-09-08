@@ -28,14 +28,14 @@ by [Sawyer Hood](https://github.com/SawyerHood).
 ## Install
 
 ```sh
-bb plugin install git:https://github.com/wy3z/bb-plugin-thread-inbox.git@^0.2.1
+rift plugin install git:https://github.com/wy3z/bb-plugin-thread-inbox.git@^0.2.1
 ```
 
 Select **Thread Inbox (w/ Children)** under **Settings → Appearance → Sidebar**. Update a
 stable installation with:
 
 ```sh
-bb plugin update thread-inbox
+rift plugin update thread-inbox
 ```
 
 ## Behavior
@@ -50,3 +50,7 @@ bb plugin update thread-inbox
   until opened.
 
 MIT licensed; see [LICENSE](LICENSE).
+
+## Rift fork
+
+Maintained for Rift. Original source and credit: [wy3z/bb-plugin-thread-inbox](https://github.com/wy3z/bb-plugin-thread-inbox). Original licensing and attribution are preserved. Use `npm ci` and `npm run build`; the pinned SDK artifact is documented in [vendor/README.md](vendor/README.md).

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type PluginSidebarThread, useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
+import { type PluginSidebarThread, useRealtime, useRealtimeConnectionState, useRpc } from "@riftlabs/plugin-sdk/app";
 import type { threadInboxRpcContract } from "./server";
 import { orderThreads, type ThreadOrderShelf } from "./thread-order";
 

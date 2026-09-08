@@ -1,6 +1,6 @@
 // bb-plugin-thread-inbox — a stable inbox-style replacement for BB's sidebar
 // thread list, with child threads nested under the parent that spawned them.
-import { definePluginApp } from "@get-bb/plugin-sdk/app";
+import { definePluginApp } from "@riftlabs/plugin-sdk/app";
 import { ThreadInbox } from "./src/ThreadInbox";
 import { ParentChip } from "./src/ParentChip";
 import { SubagentsChip } from "./src/SubagentsChip";

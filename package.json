@@ -1,35 +1,26 @@
 {
-  "name": "bb-plugin-thread-inbox",
+  "name": "rift-plugin-thread-inbox",
   "version": "0.2.1",
   "type": "module",
   "description": "A stable inbox sidebar with collapsible nested child threads.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wy3z/bb-plugin-thread-inbox.git"
+    "url": "https://github.com/euforicio/rift-plugin-thread-inbox.git"
   },
-  "homepage": "https://github.com/wy3z/bb-plugin-thread-inbox#readme",
+  "homepage": "https://riftlabs.app",
   "engines": {
-    "bb": ">=0.37.0",
-    "bbPluginSdk": ">=0.4.3"
-  },
-  "bb": {
-    "name": "Thread Inbox (w/ Children)",
-    "description": "Stable inbox ordering with collapsible nested child threads.",
-    "branding": {
-      "icon": "PanelLeft"
-    },
-    "app": "./app.tsx",
-    "server": "./src/server.ts"
+    "rift": ">=0.37.0",
+    "riftPluginSdk": ">=0.4.48"
   },
   "keywords": [
-    "bb-plugin",
+    "rift-plugin",
     "sidebar",
     "threads",
     "nested"
   ],
   "scripts": {
-    "build": "bb plugin build",
+    "build": "node tooling/build-plugin.mjs",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -40,7 +31,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@get-bb/plugin-sdk": "0.4.21",
     "@pierre/diffs": "^1.2.9",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-context-menu": "^2.3.3",
@@ -56,7 +46,6 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "bb-app": "0.37.0",
     "better-sqlite3": "12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -67,6 +56,23 @@
     "tailwind-merge": "^3.4.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vaul": "^1.1.2",
-    "vitest": "^4.1.1"
+    "vitest": "^4.1.1",
+    "@riftlabs/plugin-sdk": "0.4.48",
+    "@tailwindcss/node": "4.3.0",
+    "@tailwindcss/oxide": "4.3.0",
+    "esbuild": "0.28.1",
+    "tailwindcss": "4.3.0"
+  },
+  "rift": {
+    "name": "Thread Inbox (w/ Children)",
+    "description": "Stable inbox ordering with collapsible nested child threads.",
+    "branding": {
+      "icon": "PanelLeft"
+    },
+    "app": "./app.tsx",
+    "server": "./src/server.ts"
+  },
+  "bugs": {
+    "url": "https://github.com/euforicio/rift-plugin-thread-inbox/issues"
   }
 }

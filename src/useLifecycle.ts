@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRealtime, useRealtimeConnectionState, useRpc } from "@get-bb/plugin-sdk/app";
-import type { PluginSidebarThread } from "@get-bb/plugin-sdk";
+import { useRealtime, useRealtimeConnectionState, useRpc } from "@riftlabs/plugin-sdk/app";
+import type { PluginSidebarThread } from "@riftlabs/plugin-sdk";
 import type { threadInboxRpcContract } from "./server";
 import {
   canPark,

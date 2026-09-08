@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MouseEventHandler, type PointerEventH
 import {
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   type PluginSidebarThread,
-} from "@get-bb/plugin-sdk/app";
+} from "@riftlabs/plugin-sdk/app";
 import { cn } from "./lib/utils";
 import { threadDisplayTitle } from "./inbox";
 

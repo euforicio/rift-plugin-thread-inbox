@@ -1,4 +1,4 @@
-import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import type { PluginSidebarThread } from "@riftlabs/plugin-sdk/app";
 
 /**
  * A per-thread dot. Colour comes from the thread's id so the same thread keeps

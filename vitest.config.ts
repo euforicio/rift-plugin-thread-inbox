@@ -21,7 +21,7 @@ export default defineConfig({
     alias: { "cron-parser": "\0cron-parser-harness-stub" },
   },
   test: {
-    server: { deps: { inline: ["@get-bb/plugin-sdk"] } },
+    server: { deps: { inline: ["@riftlabs/plugin-sdk"] } },
     silent: "passed-only",
     name: "bb-plugin-thread-inbox",
     include: ["**/*.test.{ts,tsx}"],

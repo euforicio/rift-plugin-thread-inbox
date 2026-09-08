@@ -8,7 +8,7 @@ import {
   useRpc,
   type PluginSidebarThread,
   type PluginThreadListProps,
-} from "@get-bb/plugin-sdk/app";
+} from "@riftlabs/plugin-sdk/app";
 import { Icon } from "./components/Icon";
 import { cn } from "./lib/utils";
 import {
